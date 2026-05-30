@@ -11,7 +11,7 @@ Madhu-Project/
 ├── backend/
 │   └── EventBooking.API/        # ASP.NET Core Web API
 │       ├── Controllers/         # AuthController, EventsController, BookingsController
-│       ├── Data/                # AppDbContext (Entity Framework Core)
+│       ├── Data/                
 │       ├── DTOs/                # Data Transfer Objects
 │       ├── Models/              # Domain entities (User, Event, Booking, Ticket)
 │       ├── Services/            # AuthService, EventService, BookingService, EmailService
