@@ -1,0 +1,69 @@
+/* Global Styles */
+:root {
+  --primary: #6c5ce7;
+  --secondary: #a29bfe;
+  --accent: #fd79a8;
+  --dark: #2d3436;
+  --light: #f8f9fa;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f4f4f8;
+  color: var(--dark);
+}
+
+.navbar-brand { font-weight: 700; font-size: 1.4rem; }
+
+.event-card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  }
+  .card-img-top { height: 200px; object-fit: cover; }
+  .badge-category {
+    background: var(--primary);
+    color: white;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+  }
+  .price { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+}
+
+.btn-primary { background-color: var(--primary); border-color: var(--primary); }
+.btn-primary:hover { background-color: darken(#6c5ce7, 10%); }
+
+.page-hero {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: white;
+  padding: 60px 0;
+  margin-bottom: 40px;
+  border-radius: 0 0 30px 30px;
+}
+
+.filter-sidebar {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.booking-card {
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.ticket-item {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 10px;
+}
