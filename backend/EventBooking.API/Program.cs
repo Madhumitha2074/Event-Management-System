@@ -12,6 +12,8 @@ builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
