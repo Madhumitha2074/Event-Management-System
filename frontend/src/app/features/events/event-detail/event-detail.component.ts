@@ -18,7 +18,9 @@ import { ToastrService } from 'ngx-toastr';
       <!-- Hero -->
       <div class="position-relative" style="height: 400px; overflow: hidden;">
         <img [src]="event.imageUrl || 'https://via.placeholder.com/1200x400?text=' + event.title"
-             style="width:100%; height:100%; object-fit:cover;" alt="">
+            (error)="onImageError($event)"
+        style="width:100%; height:100%; object-fit:cover;"
+        alt="">
         <div class="position-absolute inset-0 w-100 h-100" style="background:rgba(0,0,0,0.5); top:0;"></div>
         <div class="position-absolute bottom-0 start-0 p-4 text-white">
           <span class="badge bg-primary mb-2">{{ event.category }}</span>
@@ -71,7 +73,7 @@ import { ToastrService } from 'ngx-toastr';
             <div class="card border-0 shadow rounded-4 sticky-top" style="top: 80px;">
               <div class="card-body p-4">
                 <div class="text-center mb-3">
-                  <div class="display-6 fw-bold text-primary">{{ event.ticketPrice === 0 ? 'Free' : ('$' + event.ticketPrice) }}</div>
+                  <div class="display-6 fw-bold text-primary">{{ event.ticketPrice === 0 ? 'Free' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}</div>
                   <small class="text-muted">per ticket</small>
                 </div>
                 <hr>
@@ -102,7 +104,7 @@ import { ToastrService } from 'ngx-toastr';
 
                   <div class="d-flex justify-content-between fw-bold mb-3">
                     <span>Total:</span>
-                    <span class="text-primary">\${{ (event.ticketPrice * bookingForm.get('ticketCount')?.value) | number:'1.2-2' }}</span>
+                    <span class="text-primary">{{ (event.ticketPrice * bookingForm.get('ticketCount')?.value) | currency:'INR':'symbol':'1.2-2' }}</span>
                   </div>
 
                   <button class="btn btn-primary w-100 py-2" type="submit" [disabled]="bookingLoading">
@@ -170,6 +172,11 @@ export class EventDetailComponent implements OnInit {
     while (this.attendeesArray.length < count) this.attendeesArray.push(this.createAttendee());
     while (this.attendeesArray.length > count) this.attendeesArray.removeAt(this.attendeesArray.length - 1);
   }
+
+  onImageError(event: any): void {
+  event.target.src =
+    'https://via.placeholder.com/1200x400?text=Event+Image';
+  } 
 
   book(): void {
     if (this.bookingForm.invalid) { this.bookingForm.markAllAsTouched(); return; }

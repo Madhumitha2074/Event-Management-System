@@ -82,11 +82,15 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
             <div class="col-md-4" *ngFor="let event of events">
               <div class="card event-card h-100">
                 <img [src]="event.imageUrl || 'https://via.placeholder.com/400x200?text=' + event.title"
-                     class="card-img-top" alt="{{ event.title }}">
+                    (error)="onImageError($event)"
+                    class="card-img-top"
+                    alt="{{ event.title }}">
                 <div class="card-body d-flex flex-column">
                   <div class="d-flex justify-content-between align-items-start mb-2">
                     <span class="badge-category">{{ event.category }}</span>
-                    <span class="price">{{ event.ticketPrice === 0 ? 'Free' : ('$' + event.ticketPrice) }}</span>
+                      <span class="price">
+                      {{ event.ticketPrice === 0 ? 'Free' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
+                      </span>         
                   </div>
                   <h6 class="fw-bold mb-1">{{ event.title }}</h6>
                   <p class="text-muted small mb-1"><i class="fas fa-map-marker-alt me-1"></i>{{ event.city }}</p>
@@ -140,6 +144,11 @@ export class EventListComponent implements OnInit {
       this.filter.page = 1;
       this.loadEvents();
     });
+  }
+
+  onImageError(event: any): void {
+  event.target.src =
+    'https://via.placeholder.com/400x200?text=Event+Image';
   }
 
   loadEvents(): void {

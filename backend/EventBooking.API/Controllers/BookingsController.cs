@@ -48,6 +48,23 @@ namespace EventBooking.API.Controllers
             catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         }
 
+        [HttpGet("{id}/download")]
+public async Task<IActionResult> DownloadBooking(int id)
+{
+    var userId = int.Parse(
+        User.FindFirstValue(ClaimTypes.NameIdentifier)!
+    );
+
+    var pdfBytes =
+        await _bookingService.GenerateBookingPdfAsync(id, userId);
+
+    return File(
+        pdfBytes,
+        "application/pdf",
+        $"Booking-{id}.pdf"
+    );
+}
+
         [HttpPost("{id}/cancel")]
         public async Task<IActionResult> CancelBooking(int id)
         {

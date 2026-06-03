@@ -31,7 +31,7 @@ import { EventService } from '../../../core/services/event.service';
                 <td class="font-monospace small">{{ b.bookingReference }}</td>
                 <td>{{ b.bookedAt | date:'MMM d, y' }}</td>
                 <td>{{ b.ticketCount }}</td>
-                <td>\${{ b.totalAmount | number:'1.2-2' }}</td>
+                <td>{{ b.totalAmount | currency:'INR':'symbol':'1.2-2' }}</td>
                 <td>
                   <div *ngFor="let t of b.tickets" class="small">
                     {{ t.attendeeName }} ({{ t.attendeeEmail }})

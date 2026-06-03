@@ -59,7 +59,7 @@ import { ToastrService } from 'ngx-toastr';
                     <input class="form-control" formControlName="address" placeholder="4 Pennsylvania Plaza, New York, NY">
                   </div>
                   <div class="col-md-6">
-                    <label class="form-label">Ticket Price ($) *</label>
+                    <label class="form-label">Ticket Price (₹) *</label>
                     <input type="number" class="form-control" formControlName="ticketPrice" placeholder="0 for free" min="0">
                   </div>
                   <div class="col-md-6">

@@ -5,19 +5,21 @@ using Microsoft.Data.SqlClient;
 namespace EventBooking.API.Services
 {
     public interface IBookingService
-    {
-        Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int userId);
-        Task<List<BookingDto>> GetUserBookingsAsync(int userId);
-        Task<BookingDto> GetBookingByIdAsync(int id, int userId);
-        Task CancelBookingAsync(int id, int userId);
-        Task<List<BookingDto>> GetEventBookingsAsync(int eventId, int organizerId);
-    }
+{
+    Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int userId);
+    Task<List<BookingDto>> GetUserBookingsAsync(int userId);
+    Task<BookingDto> GetBookingByIdAsync(int id, int userId);
+    Task CancelBookingAsync(int id, int userId);
+    Task<List<BookingDto>> GetEventBookingsAsync(int eventId, int organizerId);
+    Task<byte[]> GenerateBookingPdfAsync(int bookingId, int userId);
+}
 
     public class BookingService : IBookingService
     {
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
         private readonly IEmailService _emailService;
+        private readonly PdfService _pdfService;
 
         public BookingService(
             IConfiguration configuration,
@@ -26,6 +28,8 @@ namespace EventBooking.API.Services
             _configuration = configuration;
             _connectionString = _configuration.GetConnectionString("DefaultConnection")!;
             _emailService = emailService;
+
+            _pdfService = new PdfService();
         }
 
         public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int userId)
@@ -243,6 +247,13 @@ namespace EventBooking.API.Services
             }
 
             return bookings;
+        }
+
+        public async Task<byte[]> GenerateBookingPdfAsync(int bookingId, int userId)
+        {
+            var booking = await GetBookingByIdAsync(bookingId, userId);
+
+            return _pdfService.GenerateBookingPdf(booking);
         }
 
         private static string GenerateReference()

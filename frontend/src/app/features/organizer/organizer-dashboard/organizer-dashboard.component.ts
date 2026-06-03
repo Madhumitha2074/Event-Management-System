@@ -36,7 +36,9 @@ import { ToastrService } from 'ngx-toastr';
         </div>
         <div class="col-md-3">
           <div class="card border-0 shadow-sm rounded-4 text-center p-3">
-            <div class="display-5 fw-bold text-warning">\${{ totalRevenue | number:'1.0-0' }}</div>
+            <div class="display-5 fw-bold text-warning">
+             {{ totalRevenue | currency:'INR':'symbol':'1.0-0' }}
+            </div>
             <div class="text-muted">Revenue</div>
           </div>
         </div>
