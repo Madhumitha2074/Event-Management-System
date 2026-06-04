@@ -1,20 +1,39 @@
-using EventBooking.API.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace EventBooking.API.DTOs
 {
-    // Auth DTOs
+    // ─────────────────────────────────────────────
+    // AUTH DTOs
+    // ─────────────────────────────────────────────
+
     public class RegisterDto
     {
+        [Required(ErrorMessage = "Name is required.")]
+        [StringLength(150, MinimumLength = 2, ErrorMessage = "Name must be between 2 and 150 characters.")]
         public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
         public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required.")]
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
         public string Password { get; set; } = string.Empty;
+
+        [StringLength(30, ErrorMessage = "Phone number cannot exceed 30 characters.")]
         public string? Phone { get; set; }
-        public UserRole Role { get; set; } = UserRole.User;
+
+        [Range(0, 2, ErrorMessage = "Role must be 0 (User), 1 (Organizer), or 2 (Admin).")]
+        public int Role { get; set; } = 0;
     }
 
     public class LoginDto
     {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
         public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required.")]
         public string Password { get; set; } = string.Empty;
     }
 
@@ -34,28 +53,53 @@ namespace EventBooking.API.DTOs
         public string Email { get; set; } = string.Empty;
         public string? Phone { get; set; }
         public string Role { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
+        public string CreatedAt { get; set; } = string.Empty;
     }
 
-    // Event DTOs
+    // ─────────────────────────────────────────────
+    // EVENT DTOs
+    // ─────────────────────────────────────────────
+
     public class CreateEventDto
     {
+        [Required(ErrorMessage = "Title is required.")]
+        [StringLength(255, MinimumLength = 3, ErrorMessage = "Title must be between 3 and 255 characters.")]
         public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Description is required.")]
+        [StringLength(5000, MinimumLength = 10, ErrorMessage = "Description must be between 10 and 5000 characters.")]
         public string Description { get; set; } = string.Empty;
-        public EventCategory Category { get; set; }
-        public DateTime StartDateTime { get; set; }
-        public DateTime EndDateTime { get; set; }
+
+        [Range(0, 7, ErrorMessage = "Category must be between 0 and 7.")]
+        public int Category { get; set; }
+
+        [Required(ErrorMessage = "Start date is required.")]
+        public string StartDateTime { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "End date is required.")]
+        public string EndDateTime { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Venue is required.")]
+        [StringLength(255, MinimumLength = 2)]
         public string Venue { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "City is required.")]
+        [StringLength(100, MinimumLength = 2)]
         public string City { get; set; } = string.Empty;
+
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
+
+        [Range(0, 99999.99, ErrorMessage = "Ticket price must be between 0 and 99,999.")]
         public decimal TicketPrice { get; set; }
+
+        [Range(1, 100000, ErrorMessage = "Total tickets must be between 1 and 100,000.")]
         public int TotalTickets { get; set; }
     }
 
     public class UpdateEventDto : CreateEventDto
     {
-        public EventStatus Status { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 
     public class EventDto
@@ -65,8 +109,8 @@ namespace EventBooking.API.DTOs
         public string Description { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
-        public DateTime StartDateTime { get; set; }
-        public DateTime EndDateTime { get; set; }
+        public string StartDateTime { get; set; } = string.Empty;
+        public string EndDateTime { get; set; } = string.Empty;
         public string Venue { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;
         public string? Address { get; set; }
@@ -77,20 +121,20 @@ namespace EventBooking.API.DTOs
         public int AvailableTickets { get; set; }
         public string OrganizerName { get; set; } = string.Empty;
         public int OrganizerId { get; set; }
-        public DateTime CreatedAt { get; set; }
+        public string CreatedAt { get; set; } = string.Empty;
     }
 
     public class EventFilterDto
     {
         public string? Search { get; set; }
         public string? City { get; set; }
-        public EventCategory? Category { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
+        public int? Category { get; set; }
+        public string? StartDate { get; set; }
+        public string? EndDate { get; set; }
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
         public int Page { get; set; } = 1;
-        public int PageSize { get; set; } = 10;
+        public int PageSize { get; set; } = 9;
     }
 
     public class PagedResultDto<T>
@@ -102,17 +146,33 @@ namespace EventBooking.API.DTOs
         public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
     }
 
-    // Booking DTOs
+    // ─────────────────────────────────────────────
+    // BOOKING DTOs
+    // ─────────────────────────────────────────────
+
     public class CreateBookingDto
     {
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "EventId must be a valid event.")]
         public int EventId { get; set; }
+
+        [Required]
+        [Range(1, 10, ErrorMessage = "You can book between 1 and 10 tickets at a time.")]
         public int TicketCount { get; set; }
+
+        [Required(ErrorMessage = "Attendee details are required.")]
+        [MinLength(1, ErrorMessage = "At least one attendee is required.")]
         public List<AttendeeDto> Attendees { get; set; } = new();
     }
 
     public class AttendeeDto
     {
+        [Required(ErrorMessage = "Attendee name is required.")]
+        [StringLength(150, MinimumLength = 2)]
         public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Attendee email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid attendee email.")]
         public string Email { get; set; } = string.Empty;
     }
 
@@ -123,11 +183,11 @@ namespace EventBooking.API.DTOs
         public int EventId { get; set; }
         public string EventTitle { get; set; } = string.Empty;
         public string EventVenue { get; set; } = string.Empty;
-        public DateTime EventStartDateTime { get; set; }
+        public string EventStartDateTime { get; set; } = string.Empty;
         public int TicketCount { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = string.Empty;
-        public DateTime BookedAt { get; set; }
+        public string BookedAt { get; set; } = string.Empty;
         public List<TicketDto> Tickets { get; set; } = new();
     }
 

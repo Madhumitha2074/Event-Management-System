@@ -17,7 +17,7 @@ import { ToastrService } from 'ngx-toastr';
     <div *ngIf="event && !loading">
       <!-- Hero -->
       <div class="position-relative" style="height: 400px; overflow: hidden;">
-        <img [src]="event.imageUrl || 'https://via.placeholder.com/1200x400?text=' + event.title"
+        <img [src]="event.imageUrl || 'https://placehold.co/1200x400?text=No+Image'"
             (error)="onImageError($event)"
         style="width:100%; height:100%; object-fit:cover;"
         alt="">
@@ -174,10 +174,8 @@ export class EventDetailComponent implements OnInit {
   }
 
   onImageError(event: any): void {
-  event.target.src =
-    'https://via.placeholder.com/1200x400?text=Event+Image';
-  } 
-
+  event.target.src = 'https://placehold.co/1200x400?text=No+Image';
+}
   book(): void {
     if (this.bookingForm.invalid) { this.bookingForm.markAllAsTouched(); return; }
     this.bookingLoading = true;

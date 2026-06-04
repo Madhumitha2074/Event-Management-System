@@ -1,25 +1,43 @@
 using System.Text;
+using System.Text.Json;
+using EventBooking.API.Data;
 using EventBooking.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// -------------------- SERVICES --------------------
+// ─────────────────────────────────────────────────────
+// SERVICES
+// ─────────────────────────────────────────────────────
+
+builder.Services.AddSingleton<DatabaseHelper>();        // ✅ Singleton — holds connection string only
+builder.Services.AddSingleton<PdfService>();            // ✅ Singleton — stateless, no dependencies
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-builder.Services.AddScoped<PdfService>();
+// ✅ camelCase JSON output — matches Angular model property names
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 
-
-builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// -------------------- JWT AUTH --------------------
-var jwtKey = builder.Configuration["Jwt:Key"]!;
+// ─────────────────────────────────────────────────────
+// JWT AUTHENTICATION
+// ─────────────────────────────────────────────────────
+
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -27,9 +45,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtKey)
-            ),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
 
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
@@ -37,37 +53,49 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"],
 
-            ValidateLifetime = true
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero    // ✅ No grace period on token expiry
         };
     });
 
 builder.Services.AddAuthorization();
 
-// -------------------- CORS --------------------
+// ─────────────────────────────────────────────────────
+// CORS
+// ─────────────────────────────────────────────────────
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins(
+        "http://localhost:4200",
+        "https://localhost:4200"
+        )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
 
-// -------------------- SWAGGER --------------------
+// ─────────────────────────────────────────────────────
+// SWAGGER
+// ─────────────────────────────────────────────────────
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "Event Booking API",
-        Version = "v1"
+        Version = "v1",
+        Description = "Local Event Booking Platform — ASP.NET Core Web API"
     });
 
+    // Allow sending Bearer token from Swagger UI
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
-        Description = "Enter JWT token",
+        Description = "Enter: Bearer {your JWT token}",
         Name = "Authorization",
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
@@ -81,7 +109,7 @@ builder.Services.AddSwaggerGen(c =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
+                    Id   = "Bearer"
                 }
             },
             Array.Empty<string>()
@@ -89,45 +117,79 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// ─────────────────────────────────────────────────────
+// BUILD APP
+// ─────────────────────────────────────────────────────
+
 var app = builder.Build();
 
-// ===================== MIDDLEWARE PIPELINE =====================
+// ─────────────────────────────────────────────────────
+// GLOBAL EXCEPTION HANDLER  (must be first)
+// ─────────────────────────────────────────────────────
 
-// 🔥 MUST BE FIRST (IMPORTANT FIX)
 app.UseExceptionHandler(appError =>
 {
     appError.Run(async context =>
     {
+        // ✅ Set actual HTTP status code to 500, not just the body
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/json";
 
-        var error = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var error = context.Features.Get<IExceptionHandlerFeature>();
 
         if (error != null)
         {
+            var response = new
+            {
+                statusCode = 500,
+                message = "An unexpected server error occurred.",
+                // Only expose detail in Development — hide in Production
+                detail = app.Environment.IsDevelopment()
+                                 ? error.Error.Message
+                                 : null
+            };
+
             await context.Response.WriteAsync(
-                System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    StatusCode = 500,
-                    Message = error.Error.Message
-                })
+                JsonSerializer.Serialize(response,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    })
             );
         }
     });
 });
 
-// Swagger
-app.UseSwagger();
-app.UseSwaggerUI();
+// ─────────────────────────────────────────────────────
+// MIDDLEWARE PIPELINE  (order matters)
+// ─────────────────────────────────────────────────────
 
-// CORS
+// ✅ HTTPS redirection
+//app.UseHttpsRedirection();
+
+// ✅ CORS before everything else that serves content
 app.UseCors("AllowAngular");
 
-// Auth middleware
+// ✅ Swagger only in Development — not exposed in Production
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Event Booking API v1");
+        c.RoutePrefix = "swagger";   // Access at /swagger
+    });
+}
+
+// Auth
 app.UseAuthentication();
 app.UseAuthorization();
 
 // Controllers
 app.MapControllers();
 
-// -------------------- RUN APP --------------------
+// ─────────────────────────────────────────────────────
+// RUN
+// ─────────────────────────────────────────────────────
+
 app.Run();

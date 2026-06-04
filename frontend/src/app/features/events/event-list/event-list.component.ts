@@ -148,7 +148,7 @@ export class EventListComponent implements OnInit {
 
   onImageError(event: any): void {
   event.target.src =
-    'https://via.placeholder.com/400x200?text=Event+Image';
+    'https://placehold.co/400x200?text=No+Image';
   }
 
   loadEvents(): void {

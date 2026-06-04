@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using EventBooking.API.Data;
 using EventBooking.API.DTOs;
 using EventBooking.API.Models;
 using Microsoft.Data.SqlClient;
@@ -17,194 +18,180 @@ namespace EventBooking.API.Services
 
     public class AuthService : IAuthService
     {
+        private readonly DatabaseHelper _db;
         private readonly IConfiguration _config;
 
-        public AuthService(IConfiguration config)
+        public AuthService(DatabaseHelper db, IConfiguration config)
         {
+            _db = db;
             _config = config;
         }
 
-        private SqlConnection GetConnection()
-        {
-            return new SqlConnection(
-                _config.GetConnectionString("DefaultConnection")
-            );
-        }
-
+        // ─────────────────────────────────────────────
+        // REGISTER
+        // ─────────────────────────────────────────────
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
         {
-            using var connection = GetConnection();
-
+            using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            // Check email
-            var checkCmd = new SqlCommand(
-                "SELECT COUNT(*) FROM Users WHERE Email=@Email",
+            // 1. Check if email is already taken
+            using var checkCmd = new SqlCommand(
+                "SELECT COUNT(1) FROM Users WHERE Email = @Email",
+                connection
+            );
+            checkCmd.Parameters.AddWithValue("@Email", dto.Email.Trim().ToLower());
+
+            int exists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
+            if (exists > 0)
+                throw new InvalidOperationException("An account with this email already exists.");
+
+            // 2. Map role index from Angular (0=User, 1=Organizer, 2=Admin)
+            string roleString = dto.Role switch
+            {
+                1 => "Organizer",
+                2 => "Admin",
+                _ => "User"
+            };
+
+            // 3. Hash password
+            string passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+            // 4. Insert and get new Id using OUTPUT INSERTED.Id
+            using var insertCmd = new SqlCommand(@"
+                INSERT INTO Users (Name, Email, PasswordHash, Role, Phone)
+                OUTPUT INSERTED.Id
+                VALUES (@Name, @Email, @PasswordHash, @Role, @Phone)",
                 connection
             );
 
-            checkCmd.Parameters.AddWithValue("@Email", dto.Email);
-
-            var exists = (int)await checkCmd.ExecuteScalarAsync();
-
-            if (exists > 0)
-                throw new Exception("Email already exists");
-
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-
-            var insertCmd = new SqlCommand(@"
-INSERT INTO Users (Name, Email, PasswordHash, Role)
-VALUES (@Name, @Email, @PasswordHash, @Role);
-
-SELECT SCOPE_IDENTITY();
-", connection);
-
-            insertCmd.Parameters.AddWithValue("@Name", dto.Name);
-            insertCmd.Parameters.AddWithValue("@Email", dto.Email);
+            insertCmd.Parameters.AddWithValue("@Name",         dto.Name.Trim());
+            insertCmd.Parameters.AddWithValue("@Email",        dto.Email.Trim().ToLower());
             insertCmd.Parameters.AddWithValue("@PasswordHash", passwordHash);
-            insertCmd.Parameters.AddWithValue("@Role", dto.Role.ToString());
+            insertCmd.Parameters.AddWithValue("@Role",         roleString);
+            insertCmd.Parameters.AddWithValue("@Phone",
+                string.IsNullOrWhiteSpace(dto.Phone) ? (object)DBNull.Value : dto.Phone.Trim());
 
-            var result = await insertCmd.ExecuteScalarAsync();
-            int userId = Convert.ToInt32(result);
+            // ✅ Fix 1: Use Convert.ToInt32 to safely unbox the scalar result
+            var scalarResult = await insertCmd.ExecuteScalarAsync();
+            int newUserId = Convert.ToInt32(scalarResult);
 
-            var user = new User
-            {
-                Id = userId,
-                Name = dto.Name,
-                Email = dto.Email,
-                Role = dto.Role,
-                PasswordHash = passwordHash
-            };
-
-            return BuildAuthResponse(user);
+            // 5. Build and return JWT response
+            return BuildAuthResponse(newUserId, dto.Name.Trim(), dto.Email.Trim().ToLower(), roleString);
         }
 
+        // ─────────────────────────────────────────────
+        // LOGIN
+        // ─────────────────────────────────────────────
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
-            using var connection = GetConnection();
-
+            using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            var cmd = new SqlCommand(@"
-SELECT Id, Name, Email, PasswordHash, Role
-FROM Users
-WHERE Email=@Email
-", connection);
-
-            cmd.Parameters.AddWithValue("@Email", dto.Email);
+            using var cmd = new SqlCommand(@"
+                SELECT Id, Name, Email, PasswordHash, Role
+                FROM Users
+                WHERE Email = @Email AND IsActive = 1",
+                connection
+            );
+            cmd.Parameters.AddWithValue("@Email", dto.Email.Trim().ToLower());
 
             using var reader = await cmd.ExecuteReaderAsync();
 
             if (!await reader.ReadAsync())
-                throw new Exception("Invalid credentials");
+                throw new UnauthorizedAccessException("Invalid email or password.");
 
-            var passwordHash = reader["PasswordHash"].ToString();
+            string storedHash = reader["PasswordHash"].ToString()!;
 
-            if (!BCrypt.Net.BCrypt.Verify(dto.Password, passwordHash))
-                throw new Exception("Invalid credentials");
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, storedHash))
+                throw new UnauthorizedAccessException("Invalid email or password.");
 
-            var user = new User
-            {
-                Id = Convert.ToInt32(reader["Id"]),
-                Name = reader["Name"].ToString()!,
-                Email = reader["Email"].ToString()!,
-                PasswordHash = passwordHash!,
-                Role = Enum.Parse<UserRole>(
-                    reader["Role"].ToString()!
-                )
-            };
+            int    userId = Convert.ToInt32(reader["Id"]);
+            string name   = reader["Name"].ToString()!;
+            string email  = reader["Email"].ToString()!;
+            string role   = reader["Role"].ToString()!;
 
-            return BuildAuthResponse(user);
+            return BuildAuthResponse(userId, name, email, role);
         }
 
+        // ─────────────────────────────────────────────
+        // GET PROFILE
+        // ─────────────────────────────────────────────
         public async Task<UserProfileDto> GetProfileAsync(int userId)
         {
-            using var connection = GetConnection();
-
+            using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            var cmd = new SqlCommand(@"
-SELECT Id, Name, Email, Role
-FROM Users
-WHERE Id=@Id
-", connection);
-
+            using var cmd = new SqlCommand(@"
+                SELECT Id, Name, Email, Role, Phone, CreatedAt
+                FROM Users
+                WHERE Id = @Id AND IsActive = 1",
+                connection
+            );
             cmd.Parameters.AddWithValue("@Id", userId);
 
             using var reader = await cmd.ExecuteReaderAsync();
 
             if (!await reader.ReadAsync())
-                throw new Exception("User not found");
+                throw new KeyNotFoundException("User not found.");
 
             return new UserProfileDto
             {
-                Id = Convert.ToInt32(reader["Id"]),
-                Name = reader["Name"].ToString()!,
-                Email = reader["Email"].ToString()!,
-                Role = reader["Role"].ToString()!
+                Id        = Convert.ToInt32(reader["Id"]),
+                Name      = reader["Name"].ToString()!,
+                Email     = reader["Email"].ToString()!,
+                Role      = reader["Role"].ToString()!,
+                Phone     = reader["Phone"] == DBNull.Value
+                                ? null
+                                : reader["Phone"].ToString(),
+
+                // ✅ Fix 2: Cast reader value directly to DateTime, then format
+                CreatedAt = reader["CreatedAt"] == DBNull.Value
+                                ? string.Empty
+                                : ((DateTime)reader["CreatedAt"]).ToString("o")
             };
         }
 
-        private AuthResponseDto BuildAuthResponse(User user)
+        // ─────────────────────────────────────────────
+        // PRIVATE: Build AuthResponseDto
+        // ─────────────────────────────────────────────
+        private AuthResponseDto BuildAuthResponse(int userId, string name, string email, string role)
         {
-            var token = GenerateJwt(user);
-
             return new AuthResponseDto
             {
-                Token = token,
-                Name = user.Name,
-                Email = user.Email,
-                Role = user.Role.ToString(),
-                UserId = user.Id
+                Token  = GenerateJwt(userId, name, email, role),
+                Name   = name,
+                Email  = email,
+                Role   = role,
+                UserId = userId
             };
         }
 
-        private string GenerateJwt(User user)
+        // ─────────────────────────────────────────────
+        // PRIVATE: Generate JWT
+        // ─────────────────────────────────────────────
+        private string GenerateJwt(int userId, string name, string email, string role)
         {
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(
-                    _config["Jwt:Key"]!
-                )
-            );
-
-            var creds = new SigningCredentials(
-                key,
-                SecurityAlgorithms.HmacSha256
-            );
+            var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
-                new Claim(
-                    ClaimTypes.NameIdentifier,
-                    user.Id.ToString()
-                ),
-
-                new Claim(
-                    ClaimTypes.Email,
-                    user.Email
-                ),
-
-                new Claim(
-                    ClaimTypes.Name,
-                    user.Name
-                ),
-
-                new Claim(
-                    ClaimTypes.Role,
-                    user.Role.ToString()
-                )
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.Email,          email),
+                new Claim(ClaimTypes.Name,           name),
+                new Claim(ClaimTypes.Role,           role)
             };
 
             var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddDays(7),
+                issuer:             _config["Jwt:Issuer"],
+                audience:           _config["Jwt:Audience"],
+                claims:             claims,
+                expires:            DateTime.UtcNow.AddDays(7),
                 signingCredentials: creds
             );
 
-            return new JwtSecurityTokenHandler()
-                .WriteToken(token);
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }
