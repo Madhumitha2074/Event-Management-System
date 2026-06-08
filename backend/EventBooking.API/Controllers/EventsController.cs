@@ -205,20 +205,20 @@ namespace EventBooking.API.Controllers
         }
 
         // GET api/events/{id}/seats
-        [HttpGet("{id}/seats")]
-        [AllowAnonymous]
-        public async Task<IActionResult> GetEventSeats(int id)
-        {
-            try
-            {
-                var seats = await _seatService.GetSeatsAsync(id);
-                return Ok(seats);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Failed to load seats.", detail = ex.Message });
-            }
-        }
+        //[HttpGet("{id}/seats")]
+        //[AllowAnonymous]
+        //public async Task<IActionResult> GetEventSeats(int id)
+        //{
+           // try
+           // {
+              //  var seats = await _seatService.GetSeatsAsync(id);
+               // return Ok(seats);
+            //}
+           // catch (Exception ex)
+           // {
+               // return StatusCode(500, new { message = "Failed to load seats.", detail = ex.Message });
+           // }
+        //}
 
         // ─────────────────────────────────────────────
         // PRIVATE: Safe user ID extraction from JWT

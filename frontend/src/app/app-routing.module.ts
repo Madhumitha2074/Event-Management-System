@@ -23,6 +23,11 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     data: { roles: ['Organizer', 'Admin'] }
   },
+  // ✅ ADD SEAT-SELECTION ROUTE
+  {
+    path: 'seat-selection',
+    loadChildren: () => import('./features/seat-selection/seat-selection.module').then(m => m.SeatSelectionModule)
+  },
   { path: '**', redirectTo: '' }
 ];
 

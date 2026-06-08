@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { EventService } from '../../../core/services/event.service';
@@ -6,6 +6,7 @@ import { BookingService } from '../../../core/services/booking.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Event, EventSeat } from '../../../core/models/models';
 import { ToastrService } from 'ngx-toastr';
+import { SeatMapComponent } from '../seat-map/seat-map.component';
 
 @Component({
   selector: 'app-event-detail',
@@ -75,7 +76,8 @@ import { ToastrService } from 'ngx-toastr';
                 <!-- Seat Map Toggle - Only show if event has seat configuration -->
                 <div class="form-check form-switch mb-3" *ngIf="hasSeatMap">
                   <input class="form-check-input" type="checkbox" 
-                         id="seatSelectionToggle" [(ngModel)]="enableSeatSelection">
+                         id="seatSelectionToggle" [(ngModel)]="enableSeatSelection"
+                         [disabled]="selectionDisabled">
                   <label class="form-check-label fw-semibold" for="seatSelectionToggle">
                     <i class="fas fa-chair me-1"></i>Select Specific Seats
                   </label>
@@ -84,8 +86,10 @@ import { ToastrService } from 'ngx-toastr';
                 <!-- Seat Map Component -->
                 <div *ngIf="enableSeatSelection && hasSeatMap && seats.length > 0">
                   <app-seat-map
+                    #seatMapRef
                     [seats]="seats"
                     [maxSelectable]="10"
+                    [selectionDisabled]="selectionDisabled"
                     (selectionChange)="onSeatSelectionChange($event)">
                   </app-seat-map>
                 </div>
@@ -118,7 +122,7 @@ import { ToastrService } from 'ngx-toastr';
                   <form *ngIf="event.availableTickets > 0 && isLoggedIn" [formGroup]="bookingForm" (ngSubmit)="book()">
                     <div class="mb-3">
                       <label class="form-label fw-semibold">Number of Tickets</label>
-                      <select class="form-select" formControlName="ticketCount" (change)="updateAttendees()">
+                      <select class="form-select" formControlName="ticketCount" (change)="updateAttendees()" [disabled]="bookingLoading">
                         <option *ngFor="let n of ticketOptions" [value]="n">{{ n }}</option>
                       </select>
                     </div>
@@ -153,13 +157,15 @@ import { ToastrService } from 'ngx-toastr';
                   <div class="mb-3">
                     <label class="form-label fw-semibold">Attendee Details</label>
                     <div *ngFor="let seat of selectedSeats; let i = index" class="mb-2 p-2 bg-light rounded">
-                      <div class="small fw-bold">{{ seat.seatNumber }} ({{ seat.tier }})</div>
+                      <div class="small fw-bold">{{ seat.seatNumber }} ({{ seat.tier }}) - ₹{{ seat.price }}</div>
                       <input type="text" class="form-control form-control-sm mb-1" 
                              placeholder="Full Name" [(ngModel)]="seatAttendees[i].name" 
-                             [ngModelOptions]="{standalone: true}">
+                             [ngModelOptions]="{standalone: true}"
+                             [disabled]="bookingLoading || selectionDisabled">
                       <input type="email" class="form-control form-control-sm" 
                              placeholder="Email" [(ngModel)]="seatAttendees[i].email"
-                             [ngModelOptions]="{standalone: true}">
+                             [ngModelOptions]="{standalone: true}"
+                             [disabled]="bookingLoading || selectionDisabled">
                     </div>
                   </div>
 
@@ -168,10 +174,10 @@ import { ToastrService } from 'ngx-toastr';
                     <span class="text-primary">{{ seatTotalAmount | currency:'INR':'symbol':'1.2-2' }}</span>
                   </div>
 
-                  <button class="btn btn-primary w-100 py-2" (click)="bookWithSeats()" [disabled]="bookingLoading || !isSeatAttendeesValid()">
+                  <button class="btn btn-primary w-100 py-2" (click)="bookWithSeats()" [disabled]="bookingLoading || !isSeatAttendeesValid() || selectionDisabled">
                     <span *ngIf="bookingLoading" class="spinner-border spinner-border-sm me-2"></span>
                     <i *ngIf="!bookingLoading" class="fas fa-ticket-alt me-2"></i>
-                    Book Selected Seats
+                    {{ bookingLoading ? 'Processing...' : 'Book Selected Seats' }}
                   </button>
                 </div>
 
@@ -188,6 +194,8 @@ import { ToastrService } from 'ngx-toastr';
   `
 })
 export class EventDetailComponent implements OnInit {
+  @ViewChild('seatMapRef') seatMapComponent!: SeatMapComponent;
+
   event: Event | null = null;
   seats: EventSeat[] = [];
   selectedSeats: EventSeat[] = [];
@@ -199,6 +207,7 @@ export class EventDetailComponent implements OnInit {
   isLoggedIn = false;
   enableSeatSelection = false;
   hasSeatMap = false;
+  selectionDisabled = false;
   ticketOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   constructor(
@@ -223,11 +232,9 @@ export class EventDetailComponent implements OnInit {
       this.eventService.getEventById(+id).subscribe({
         next: (ev) => { 
           this.event = ev; 
-          // Check if event has seat configuration
           this.hasSeatMap = ev.seatConfig ? true : false;
           this.loading = false;
           
-          // Pre-load seats if event has seat map
           if (this.hasSeatMap) {
             this.loadSeats();
           }
@@ -258,7 +265,6 @@ export class EventDetailComponent implements OnInit {
 
   onSeatSelectionChange(seats: EventSeat[]): void {
     this.selectedSeats = seats;
-    // Initialize attendee array for selected seats
     this.seatAttendees = seats.map(() => ({ name: '', email: '' }));
   }
 
@@ -326,6 +332,7 @@ export class EventDetailComponent implements OnInit {
     });
   }
 
+  // FIXED: Proper error handling without false positives
   bookWithSeats(): void {
     if (this.selectedSeats.length === 0) {
       this.toastr.warning('Please select at least one seat.');
@@ -338,6 +345,8 @@ export class EventDetailComponent implements OnInit {
     }
 
     this.bookingLoading = true;
+    this.selectionDisabled = true;
+
     this.bookingService.createBookingWithSeats({
       eventId: this.event!.id,
       seatIds: this.selectedSeats.map(s => s.id),
@@ -348,8 +357,43 @@ export class EventDetailComponent implements OnInit {
         this.router.navigate(['/bookings', booking.id]);
       },
       error: (err) => {
-        this.toastr.error(err.error?.message || 'Booking failed.');
+        // Log the full error for debugging
+        console.error('Booking error details:', err);
+        
+        // Get the actual error message
+        let errorMsg = '';
+        if (err.error?.message) {
+          errorMsg = err.error.message;
+        } else if (err.message) {
+          errorMsg = err.message;
+        } else {
+          errorMsg = 'Booking failed.';
+        }
+        
+        console.log('Error message:', errorMsg);
+        
+        // Check for specific concurrency/seat conflict errors
+        const isConcurrencyError = 
+          errorMsg.includes('already booked') || 
+          errorMsg.includes('no longer available') ||
+          errorMsg.includes('50001') ||
+          (errorMsg.includes('seat') && errorMsg.includes('already'));
+        
+        if (isConcurrencyError) {
+          this.toastr.error('Some seats were just booked by another user. Please refresh and try again.');
+          // Refresh seat map
+          this.loadSeats();
+          // Clear current selection
+          this.selectedSeats = [];
+          this.seatAttendees = [];
+        } else {
+          // Show the actual error message
+          this.toastr.error(errorMsg);
+        }
+        
         this.bookingLoading = false;
+        this.selectionDisabled = false;
+        this.enableSeatSelection = true;
       }
     });
   }

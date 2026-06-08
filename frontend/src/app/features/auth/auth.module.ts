@@ -5,6 +5,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { LoginComponent }    from './login/login.component';
 import { RegisterComponent } from './register/register.component';
 import { ProfileComponent }  from './profile/profile.component';  // ✅ add
+import { FormsModule } from '@angular/forms';
 
 const routes: Routes = [
   { path: 'login',    component: LoginComponent    },
@@ -21,6 +22,7 @@ const routes: Routes = [
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     RouterModule.forChild(routes)
   ]
 })

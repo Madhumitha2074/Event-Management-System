@@ -21,88 +21,99 @@ export interface SeatSelection {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="seat-map-wrap">
-
-      <!-- Legend -->
-      <div class="seat-legend">
-        <div class="legend-item">
-          <span class="legend-dot available"></span> Available
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot booked"></span> Booked
-        </div>
-        <div class="legend-item">
-          <span class="legend-dot selected"></span> Selected
-        </div>
-        <div class="legend-item" *ngFor="let tier of tierOrder">
-          <span class="legend-dot tier-dot"
-                [style.background]="tierColors[tier].bg"
-                [style.border-color]="tierColors[tier].border"></span>
-          {{ tier }} — ₹{{ tierPrice(tier) }}
-        </div>
+      <!-- Loading indicator -->
+      <div *ngIf="loading" class="text-center py-4">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <p class="small text-muted mt-2">Loading seat map...</p>
       </div>
 
-      <!-- Stage -->
-      <div class="stage-bar">
-        <span>🎭 STAGE / SCREEN</span>
-      </div>
-
-      <!-- Sections -->
-      <div class="sections-wrap">
-        <div class="seat-section" *ngFor="let section of sections">
-
-          <div class="section-header"
-               [style.background]="tierColors[section.tier].bg"
-               [style.color]="tierColors[section.tier].text">
-            <span class="section-title">{{ section.tier }}</span>
-            <span class="section-price">₹{{ section.pricePerSeat }} / seat</span>
+      <div *ngIf="!loading">
+        <!-- Legend -->
+        <div class="seat-legend">
+          <div class="legend-item">
+            <span class="legend-dot available"></span> Available
           </div>
+          <div class="legend-item">
+            <span class="legend-dot booked"></span> Booked
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot selected"></span> Selected
+          </div>
+          <div class="legend-item" *ngFor="let tier of tierOrder">
+            <span class="legend-dot tier-dot"
+                  [style.background]="tierColors[tier].bg"
+                  [style.border-color]="tierColors[tier].border"></span>
+            {{ tier }} — ₹{{ tierPrice(tier) }}
+          </div>
+        </div>
 
-          <div class="rows-wrap">
-            <div class="seat-row" *ngFor="let row of section.rows">
-              <span class="row-label">{{ row.rowLabel }}</span>
+        <!-- Stage -->
+        <div class="stage-bar">
+          <span>🎭 STAGE / SCREEN</span>
+        </div>
 
-              <div class="seats-in-row">
-                <button
-                  *ngFor="let seat of row.seats"
-                  class="seat-btn"
-                  [class.seat-booked]="seat.isBooked"
-                  [class.seat-selected]="isSelected(seat.id)"
-                  [class.seat-available]="!seat.isBooked && !isSelected(seat.id)"
-                  [disabled]="seat.isBooked"
-                  [title]="seatTooltip(seat)"
-                  (click)="toggleSeat(seat)"
-                  [style.--tier-bg]="tierColors[section.tier].bg"
-                  [style.--tier-border]="tierColors[section.tier].border">
-                  {{ seatLabel(seat.seatNumber) }}
-                </button>
-              </div>
+        <!-- Sections -->
+        <div class="sections-wrap">
+          <div class="seat-section" *ngFor="let section of sections">
 
-              <span class="row-label">{{ row.rowLabel }}</span>
+            <div class="section-header"
+                 [style.background]="tierColors[section.tier].bg"
+                 [style.color]="tierColors[section.tier].text">
+              <span class="section-title">{{ section.tier }}</span>
+              <span class="section-price">₹{{ section.pricePerSeat }} / seat</span>
             </div>
+
+            <div class="rows-wrap">
+              <div class="seat-row" *ngFor="let row of section.rows">
+                <span class="row-label">{{ row.rowLabel }}</span>
+
+                <div class="seats-in-row">
+                  <button
+                    *ngFor="let seat of row.seats"
+                    class="seat-btn"
+                    [class.seat-booked]="seat.isBooked"
+                    [class.seat-selected]="isSelected(seat.id)"
+                    [class.seat-available]="!seat.isBooked && !isSelected(seat.id)"
+                    [disabled]="seat.isBooked || selectionDisabled"
+                    [title]="seatTooltip(seat)"
+                    (click)="toggleSeat(seat)"
+                    [style.--tier-bg]="tierColors[section.tier].bg"
+                    [style.--tier-border]="tierColors[section.tier].border">
+                    {{ seatLabel(seat.seatNumber) }}
+                  </button>
+                </div>
+
+                <span class="row-label">{{ row.rowLabel }}</span>
+              </div>
+            </div>
+
           </div>
+        </div>
 
+        <!-- Selection summary -->
+        <div class="selection-summary" *ngIf="selectedSeats.length > 0">
+          <div class="summary-chips">
+            <span class="chip" *ngFor="let s of selectedSeats">
+              {{ s.seatNumber }}
+              <span class="chip-tier">({{ s.tier }}) ₹{{ s.price }}</span>
+              <button class="chip-remove" (click)="removeSeat(s)" [disabled]="selectionDisabled">✕</button>
+            </span>
+          </div>
+          <div class="summary-total">
+            <span>{{ selectedSeats.length }} seat(s) selected</span>
+            <span class="total-price">Total: ₹{{ totalPrice | number:'1.2-2' }}</span>
+          </div>
+        </div>
+
+        <div class="no-selection" *ngIf="selectedSeats.length === 0">
+          <i class="fas fa-chair me-1"></i> Click seats above to select them
+        </div>
+
+        <!-- Max selection warning -->
+        <div class="max-warning" *ngIf="selectedSeats.length >= maxSelectable && selectedSeats.length > 0">
+          <i class="fas fa-info-circle me-1"></i> Maximum {{ maxSelectable }} seats per booking
         </div>
       </div>
-
-      <!-- Selection summary -->
-      <div class="selection-summary" *ngIf="selectedSeats.length > 0">
-        <div class="summary-chips">
-          <span class="chip" *ngFor="let s of selectedSeats">
-            {{ s.seatNumber }}
-            <span class="chip-tier">({{ s.tier }})</span>
-            <button class="chip-remove" (click)="toggleSeat(s)">✕</button>
-          </span>
-        </div>
-        <div class="summary-total">
-          <span>{{ selectedSeats.length }} seat(s) selected</span>
-          <span class="total-price">Total: ₹{{ totalPrice | number:'1.2-2' }}</span>
-        </div>
-      </div>
-
-      <div class="no-selection" *ngIf="selectedSeats.length === 0">
-        Click seats above to select them
-      </div>
-
     </div>
   `,
   styles: [`
@@ -188,7 +199,7 @@ export interface SeatSelection {
       margin-bottom: 6px;
     }
     .row-label {
-      width: 22px;
+      width: 32px;
       text-align: center;
       font-size: 0.7rem;
       font-weight: 700;
@@ -203,12 +214,12 @@ export interface SeatSelection {
 
     /* ── Seat button ─────────────────────────────────────────── */
     .seat-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 5px;
+      width: 48px;
+      height: 32px;
+      border-radius: 6px;
       border: 2px solid #adb5bd;
       background: #e9ecef;
-      font-size: 0.58rem;
+      font-size: 0.62rem;
       font-weight: 700;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -217,7 +228,7 @@ export interface SeatSelection {
       line-height: 1;
     }
     .seat-btn:hover:not(:disabled) {
-      transform: scale(1.15);
+      transform: scale(1.05);
       border-color: var(--tier-border, #6c5ce7);
       background: var(--tier-bg, #e9ecef);
       z-index: 1;
@@ -233,10 +244,13 @@ export interface SeatSelection {
       background: #6c5ce7 !important;
       border-color: #4a3ab5 !important;
       color: #fff !important;
-      transform: scale(1.1);
-      box-shadow: 0 0 0 3px rgba(108,92,231,0.25);
+      transform: scale(1.03);
+      box-shadow: 0 0 0 2px rgba(108,92,231,0.3);
     }
-    .seat-btn:disabled { pointer-events: none; }
+    .seat-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
 
     /* ── Summary ─────────────────────────────────────────────── */
     .selection-summary {
@@ -268,12 +282,13 @@ export interface SeatSelection {
       border: none;
       color: #fff;
       cursor: pointer;
-      padding: 0 2px;
+      padding: 0 4px;
       font-size: 0.8rem;
-      opacity: 0.7;
+      opacity: 0.8;
       line-height: 1;
     }
-    .chip-remove:hover { opacity: 1; }
+    .chip-remove:hover:not(:disabled) { opacity: 1; }
+    .chip-remove:disabled { cursor: not-allowed; opacity: 0.5; }
     .summary-total {
       display: flex;
       justify-content: space-between;
@@ -294,11 +309,21 @@ export interface SeatSelection {
       font-size: 0.85rem;
       font-style: italic;
     }
+    .max-warning {
+      text-align: center;
+      padding: 10px;
+      margin-top: 10px;
+      color: #e67e22;
+      background: #fff3e0;
+      border-radius: 8px;
+      font-size: 0.75rem;
+    }
 
     /* ── Responsive ──────────────────────────────────────────── */
     @media (max-width: 480px) {
-      .seat-btn { width: 22px; height: 22px; font-size: 0.5rem; }
+      .seat-btn { width: 38px; height: 28px; font-size: 0.55rem; }
       .seats-in-row { gap: 3px; }
+      .row-label { width: 28px; font-size: 0.65rem; }
     }
   `]
 })
@@ -306,6 +331,8 @@ export class SeatMapComponent implements OnChanges {
 
   @Input() seats: EventSeat[] = [];
   @Input() maxSelectable = 10;
+  @Input() selectionDisabled = false;
+  @Input() loading = false;
 
   @Output() selectionChange = new EventEmitter<EventSeat[]>();
 
@@ -322,20 +349,24 @@ export class SeatMapComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['seats']) {
       this.buildSections();
-      // Clear selection when seats reload
       this.selectedIds.clear();
       this.selectedSeats = [];
+      this.selectionChange.emit([]);
     }
   }
 
   buildSections(): void {
+    if (!this.seats || this.seats.length === 0) {
+      this.sections = [];
+      return;
+    }
+
     const map = new Map<SeatTier, Map<string, EventSeat[]>>();
 
     for (const seat of this.seats) {
       const tier = seat.tier as SeatTier;
       if (!map.has(tier)) map.set(tier, new Map());
 
-      // Extract row label from seatNumber e.g. "P-A3" → "A"
       const rowLabel = seat.seatNumber.split('-')[1]?.replace(/\d+/g, '') ?? '?';
       const rowMap = map.get(tier)!;
       if (!rowMap.has(rowLabel)) rowMap.set(rowLabel, []);
@@ -364,14 +395,14 @@ export class SeatMapComponent implements OnChanges {
   }
 
   toggleSeat(seat: EventSeat): void {
-    if (seat.isBooked) return;
+    if (seat.isBooked || this.selectionDisabled) return;
 
     if (this.selectedIds.has(seat.id)) {
       this.selectedIds.delete(seat.id);
       this.selectedSeats = this.selectedSeats.filter(s => s.id !== seat.id);
     } else {
       if (this.selectedSeats.length >= this.maxSelectable) {
-        return; // silently cap at max
+        return;
       }
       this.selectedIds.add(seat.id);
       this.selectedSeats = [...this.selectedSeats, seat];
@@ -380,22 +411,35 @@ export class SeatMapComponent implements OnChanges {
     this.selectionChange.emit([...this.selectedSeats]);
   }
 
+  removeSeat(seat: EventSeat): void {
+    if (this.selectionDisabled) return;
+    this.toggleSeat(seat);
+  }
+
   isSelected(id: number): boolean {
     return this.selectedIds.has(id);
   }
 
+  // FIXED: Show full seat number (e.g., "P-A1" instead of just "A1")
   seatLabel(seatNumber: string): string {
-    // "P-A3" → "A3"
-    return seatNumber.split('-')[1] ?? seatNumber;
+    // Return the full seat number for better clarity
+    return seatNumber;
   }
 
   seatTooltip(seat: EventSeat): string {
     if (seat.isBooked) return `${seat.seatNumber} — Booked`;
+    if (this.selectionDisabled) return `${seat.seatNumber} — Booking in progress`;
     return `${seat.seatNumber} | ${seat.tier} | ₹${seat.price}`;
   }
 
   tierPrice(tier: SeatTier): number {
     const section = this.sections.find(s => s.tier === tier);
     return section?.pricePerSeat ?? 0;
+  }
+
+  clearSelection(): void {
+    this.selectedIds.clear();
+    this.selectedSeats = [];
+    this.selectionChange.emit([]);
   }
 }
