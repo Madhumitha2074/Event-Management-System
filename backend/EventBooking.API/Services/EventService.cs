@@ -1,17 +1,18 @@
 using EventBooking.API.Data;
 using EventBooking.API.DTOs;
 using Microsoft.Data.SqlClient;
+using System.Text.Json;
 
 namespace EventBooking.API.Services
 {
     public interface IEventService
     {
         Task<PagedResultDto<EventDto>> GetEventsAsync(EventFilterDto filter);
-        Task<EventDto>                GetEventByIdAsync(int id);
-        Task<EventDto>                CreateEventAsync(CreateEventDto dto, int organizerId);
-        Task<EventDto>                UpdateEventAsync(int id, UpdateEventDto dto, int organizerId);
-        Task                          DeleteEventAsync(int id, int organizerId);
-        Task<List<EventDto>>          GetOrganizerEventsAsync(int organizerId);
+        Task<EventDto> GetEventByIdAsync(int id);
+        Task<EventDto> CreateEventAsync(CreateEventDto dto, int organizerId);
+        Task<EventDto> UpdateEventAsync(int id, UpdateEventDto dto, int organizerId);
+        Task DeleteEventAsync(int id, int organizerId);
+        Task<List<EventDto>> GetOrganizerEventsAsync(int organizerId);
     }
 
     public class EventService : IEventService
@@ -35,63 +36,71 @@ namespace EventBooking.API.Services
         // ─────────────────────────────────────────────
         public async Task<PagedResultDto<EventDto>> GetEventsAsync(EventFilterDto filter)
         {
-            var events     = new List<EventDto>();
+            var events = new List<EventDto>();
             int totalCount = 0;
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            // ── Build dynamic WHERE clause ──────────────────────────────────
+            // ── Build dynamic WHERE clause ──────────────────────────────
             var conditions = new List<string> { "e.Status = 'Published'" };
-            var parameters = new List<SqlParameter>();
+
+            var paramValues = new List<(string Name, object Value)>();
 
             if (!string.IsNullOrWhiteSpace(filter.Search))
             {
                 conditions.Add("(e.Title LIKE @Search OR e.Description LIKE @Search OR e.City LIKE @Search)");
-                parameters.Add(new SqlParameter("@Search", $"%{filter.Search.Trim()}%"));
+                paramValues.Add(("@Search", $"%{filter.Search.Trim()}%"));
             }
 
             if (!string.IsNullOrWhiteSpace(filter.City))
             {
-                conditions.Add("e.City = @City");
-                parameters.Add(new SqlParameter("@City", filter.City.Trim()));
+                conditions.Add("e.City LIKE @City");
+                paramValues.Add(("@City", $"%{filter.City.Trim()}%"));
             }
 
-            if (filter.Category.HasValue && filter.Category.Value >= 0 && filter.Category.Value < CategoryNames.Length)
+            if (filter.Category.HasValue &&
+                filter.Category.Value >= 0 &&
+                filter.Category.Value < CategoryNames.Length)
             {
                 conditions.Add("e.Category = @Category");
-                parameters.Add(new SqlParameter("@Category", CategoryNames[filter.Category.Value]));
+                paramValues.Add(("@Category", CategoryNames[filter.Category.Value]));
             }
 
             if (!string.IsNullOrWhiteSpace(filter.StartDate) &&
                 DateTime.TryParse(filter.StartDate, out DateTime startDate))
             {
                 conditions.Add("e.StartDateTime >= @StartDate");
-                parameters.Add(new SqlParameter("@StartDate", startDate));
+                paramValues.Add(("@StartDate", startDate));
             }
 
             if (!string.IsNullOrWhiteSpace(filter.EndDate) &&
                 DateTime.TryParse(filter.EndDate, out DateTime endDate))
             {
                 conditions.Add("e.StartDateTime <= @EndDate");
-                parameters.Add(new SqlParameter("@EndDate", endDate));
+                paramValues.Add(("@EndDate", endDate));
             }
 
             if (filter.MinPrice.HasValue)
             {
                 conditions.Add("e.TicketPrice >= @MinPrice");
-                parameters.Add(new SqlParameter("@MinPrice", filter.MinPrice.Value));
+                paramValues.Add(("@MinPrice", filter.MinPrice.Value));
             }
 
             if (filter.MaxPrice.HasValue)
             {
                 conditions.Add("e.TicketPrice <= @MaxPrice");
-                parameters.Add(new SqlParameter("@MaxPrice", filter.MaxPrice.Value));
+                paramValues.Add(("@MaxPrice", filter.MaxPrice.Value));
             }
 
             string whereClause = string.Join(" AND ", conditions);
 
-            // ── Step 1: Get total count for pagination ──────────────────────
+            SqlParameter[] MakeParams() =>
+                paramValues
+                    .Select(p => new SqlParameter(p.Name, p.Value))
+                    .ToArray();
+
+            // ── Step 1: Total count for pagination ───────────────────────
             string countQuery = $@"
                 SELECT COUNT(1)
                 FROM   Events e
@@ -99,7 +108,7 @@ namespace EventBooking.API.Services
 
             using (var countCmd = new SqlCommand(countQuery, connection))
             {
-                countCmd.Parameters.AddRange(parameters.ToArray());
+                countCmd.Parameters.AddRange(MakeParams());
                 totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
             }
 
@@ -107,14 +116,14 @@ namespace EventBooking.API.Services
             {
                 return new PagedResultDto<EventDto>
                 {
-                    Items      = events,
+                    Items = events,
                     TotalCount = 0,
-                    Page       = filter.Page,
-                    PageSize   = filter.PageSize
+                    Page = filter.Page,
+                    PageSize = filter.PageSize
                 };
             }
 
-            // ── Step 2: Get paged data ──────────────────────────────────────
+            // ── Step 2: Paged data ───────────────────────────────────────
             int offset = (filter.Page - 1) * filter.PageSize;
 
             string dataQuery = $@"
@@ -135,6 +144,7 @@ namespace EventBooking.API.Services
                        (e.TotalTickets - e.BookedTickets) AS AvailableTickets,
                        e.OrganizerId,
                        e.CreatedAt,
+                       e.SeatConfig,
                        u.Name AS OrganizerName
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
@@ -144,22 +154,19 @@ namespace EventBooking.API.Services
 
             using (var dataCmd = new SqlCommand(dataQuery, connection))
             {
-                dataCmd.Parameters.AddRange(parameters.ToArray());
+                dataCmd.Parameters.AddRange(MakeParams());
 
                 using var reader = await dataCmd.ExecuteReaderAsync();
-
                 while (await reader.ReadAsync())
-                {
                     events.Add(MapReaderToEventDto(reader));
-                }
             }
 
             return new PagedResultDto<EventDto>
             {
-                Items      = events,
+                Items = events,
                 TotalCount = totalCount,
-                Page       = filter.Page,
-                PageSize   = filter.PageSize
+                Page = filter.Page,
+                PageSize = filter.PageSize
             };
         }
 
@@ -189,6 +196,7 @@ namespace EventBooking.API.Services
                        (e.TotalTickets - e.BookedTickets) AS AvailableTickets,
                        e.OrganizerId,
                        e.CreatedAt,
+                       e.SeatConfig,
                        u.Name AS OrganizerName
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
@@ -206,11 +214,10 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // CREATE EVENT
+        // CREATE EVENT (with seat configuration support)
         // ─────────────────────────────────────────────
         public async Task<EventDto> CreateEventAsync(CreateEventDto dto, int organizerId)
         {
-            // ✅ Parse date strings from Angular into DateTime for SQL Server
             if (!DateTime.TryParse(dto.StartDateTime, out DateTime startDateTime))
                 throw new ArgumentException("Invalid StartDateTime format.");
 
@@ -220,48 +227,78 @@ namespace EventBooking.API.Services
             if (endDateTime <= startDateTime)
                 throw new ArgumentException("EndDateTime must be after StartDateTime.");
 
-            // ✅ Map category int to string
             string categoryName = (dto.Category >= 0 && dto.Category < CategoryNames.Length)
                 ? CategoryNames[dto.Category]
                 : "Other";
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
+            
+            using var transaction = connection.BeginTransaction();
 
-            string query = @"
-                INSERT INTO Events
-                    (Title, Description, Category, Status,
-                     StartDateTime, EndDateTime, Venue, City,
-                     Address, ImageUrl, TicketPrice, TotalTickets,
-                     BookedTickets, OrganizerId)
-                OUTPUT INSERTED.Id
-                VALUES
-                    (@Title, @Description, @Category, 'Draft',
-                     @StartDateTime, @EndDateTime, @Venue, @City,
-                     @Address, @ImageUrl, @TicketPrice, @TotalTickets,
-                     0, @OrganizerId)";
+            try
+            {
+                // Calculate totals based on seat configuration
+                string? seatConfigJson = null;
+                int totalTickets = dto.TotalTickets;
+                decimal ticketPrice = dto.TicketPrice;
+                
+                if (dto.SeatTiers != null && dto.SeatTiers.Any())
+                {
+                    seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers);
+                    totalTickets = dto.SeatTiers.Sum(t => t.Rows * t.SeatsPerRow);
+                    ticketPrice = dto.SeatTiers.Min(t => t.Price);
+                }
 
-            using var cmd = new SqlCommand(query, connection);
+                string query = @"
+                    INSERT INTO Events
+                        (Title, Description, Category, Status,
+                         StartDateTime, EndDateTime, Venue, City,
+                         Address, ImageUrl, TicketPrice, TotalTickets,
+                         BookedTickets, OrganizerId, SeatConfig)
+                    OUTPUT INSERTED.Id
+                    VALUES
+                        (@Title, @Description, @Category, 'Draft',
+                         @StartDateTime, @EndDateTime, @Venue, @City,
+                         @Address, @ImageUrl, @TicketPrice, @TotalTickets,
+                         0, @OrganizerId, @SeatConfig)";
 
-            cmd.Parameters.AddWithValue("@Title",         dto.Title.Trim());
-            cmd.Parameters.AddWithValue("@Description",   dto.Description.Trim());
-            cmd.Parameters.AddWithValue("@Category",      categoryName);
-            cmd.Parameters.AddWithValue("@StartDateTime", startDateTime);
-            cmd.Parameters.AddWithValue("@EndDateTime",   endDateTime);
-            cmd.Parameters.AddWithValue("@Venue",         dto.Venue.Trim());
-            cmd.Parameters.AddWithValue("@City",          dto.City.Trim());
-            cmd.Parameters.AddWithValue("@Address",
-                string.IsNullOrWhiteSpace(dto.Address)  ? (object)DBNull.Value : dto.Address.Trim());
-            cmd.Parameters.AddWithValue("@ImageUrl",
-                string.IsNullOrWhiteSpace(dto.ImageUrl) ? (object)DBNull.Value : dto.ImageUrl.Trim());
-            cmd.Parameters.AddWithValue("@TicketPrice",   dto.TicketPrice);
-            cmd.Parameters.AddWithValue("@TotalTickets",  dto.TotalTickets);
-            cmd.Parameters.AddWithValue("@OrganizerId",   organizerId);
+                using var cmd = new SqlCommand(query, connection, transaction);
 
-            var scalar  = await cmd.ExecuteScalarAsync();
-            int eventId = Convert.ToInt32(scalar);
+                cmd.Parameters.AddWithValue("@Title", dto.Title.Trim());
+                cmd.Parameters.AddWithValue("@Description", dto.Description.Trim());
+                cmd.Parameters.AddWithValue("@Category", categoryName);
+                cmd.Parameters.AddWithValue("@StartDateTime", startDateTime);
+                cmd.Parameters.AddWithValue("@EndDateTime", endDateTime);
+                cmd.Parameters.AddWithValue("@Venue", dto.Venue.Trim());
+                cmd.Parameters.AddWithValue("@City", dto.City.Trim());
+                cmd.Parameters.AddWithValue("@Address",
+                    string.IsNullOrWhiteSpace(dto.Address) ? (object)DBNull.Value : dto.Address.Trim());
+                cmd.Parameters.AddWithValue("@ImageUrl",
+                    string.IsNullOrWhiteSpace(dto.ImageUrl) ? (object)DBNull.Value : dto.ImageUrl.Trim());
+                cmd.Parameters.AddWithValue("@TicketPrice", ticketPrice);
+                cmd.Parameters.AddWithValue("@TotalTickets", totalTickets);
+                cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
+                cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
 
-            return await GetEventByIdAsync(eventId);
+                var scalar = await cmd.ExecuteScalarAsync();
+                int eventId = Convert.ToInt32(scalar);
+
+                // Generate seats if seat tiers are configured
+                if (dto.SeatTiers != null && dto.SeatTiers.Any())
+                {
+                    var seatService = new SeatService(_db);
+                    await seatService.GenerateSeatsAsync(eventId, dto.SeatTiers, connection, transaction);
+                }
+
+                await transaction.CommitAsync();
+                return await GetEventByIdAsync(eventId);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // ─────────────────────────────────────────────
@@ -269,7 +306,6 @@ namespace EventBooking.API.Services
         // ─────────────────────────────────────────────
         public async Task<EventDto> UpdateEventAsync(int id, UpdateEventDto dto, int organizerId)
         {
-            // ✅ Parse date strings
             if (!DateTime.TryParse(dto.StartDateTime, out DateTime startDateTime))
                 throw new ArgumentException("Invalid StartDateTime format.");
 
@@ -279,7 +315,6 @@ namespace EventBooking.API.Services
             if (endDateTime <= startDateTime)
                 throw new ArgumentException("EndDateTime must be after StartDateTime.");
 
-            // ✅ Map category int to string
             string categoryName = (dto.Category >= 0 && dto.Category < CategoryNames.Length)
                 ? CategoryNames[dto.Category]
                 : "Other";
@@ -294,12 +329,19 @@ namespace EventBooking.API.Services
 
             using (var checkCmd = new SqlCommand(ownerCheck, connection))
             {
-                checkCmd.Parameters.AddWithValue("@Id",          id);
+                checkCmd.Parameters.AddWithValue("@Id", id);
                 checkCmd.Parameters.AddWithValue("@OrganizerId", organizerId);
 
                 int count = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
                 if (count == 0)
                     throw new UnauthorizedAccessException("You do not own this event.");
+            }
+
+            // Calculate seat config if provided
+            string? seatConfigJson = null;
+            if (dto.SeatTiers != null && dto.SeatTiers.Any())
+            {
+                seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers);
             }
 
             string query = @"
@@ -316,30 +358,47 @@ namespace EventBooking.API.Services
                        ImageUrl      = @ImageUrl,
                        TicketPrice   = @TicketPrice,
                        TotalTickets  = @TotalTickets,
+                       SeatConfig    = @SeatConfig,
                        UpdatedAt     = @UpdatedAt
                 WHERE  Id = @Id AND OrganizerId = @OrganizerId";
 
             using var cmd = new SqlCommand(query, connection);
 
-            cmd.Parameters.AddWithValue("@Id",            id);
-            cmd.Parameters.AddWithValue("@OrganizerId",   organizerId);
-            cmd.Parameters.AddWithValue("@Title",         dto.Title.Trim());
-            cmd.Parameters.AddWithValue("@Description",   dto.Description.Trim());
-            cmd.Parameters.AddWithValue("@Category",      categoryName);
-            cmd.Parameters.AddWithValue("@Status",        dto.Status.Trim());
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
+            cmd.Parameters.AddWithValue("@Title", dto.Title.Trim());
+            cmd.Parameters.AddWithValue("@Description", dto.Description.Trim());
+            cmd.Parameters.AddWithValue("@Category", categoryName);
+            cmd.Parameters.AddWithValue("@Status", dto.Status.Trim());
             cmd.Parameters.AddWithValue("@StartDateTime", startDateTime);
-            cmd.Parameters.AddWithValue("@EndDateTime",   endDateTime);
-            cmd.Parameters.AddWithValue("@Venue",         dto.Venue.Trim());
-            cmd.Parameters.AddWithValue("@City",          dto.City.Trim());
+            cmd.Parameters.AddWithValue("@EndDateTime", endDateTime);
+            cmd.Parameters.AddWithValue("@Venue", dto.Venue.Trim());
+            cmd.Parameters.AddWithValue("@City", dto.City.Trim());
             cmd.Parameters.AddWithValue("@Address",
-                string.IsNullOrWhiteSpace(dto.Address)  ? (object)DBNull.Value : dto.Address.Trim());
+                string.IsNullOrWhiteSpace(dto.Address) ? (object)DBNull.Value : dto.Address.Trim());
             cmd.Parameters.AddWithValue("@ImageUrl",
                 string.IsNullOrWhiteSpace(dto.ImageUrl) ? (object)DBNull.Value : dto.ImageUrl.Trim());
-            cmd.Parameters.AddWithValue("@TicketPrice",   dto.TicketPrice);
-            cmd.Parameters.AddWithValue("@TotalTickets",  dto.TotalTickets);
-            cmd.Parameters.AddWithValue("@UpdatedAt",     DateTime.UtcNow);
+            cmd.Parameters.AddWithValue("@TicketPrice", dto.TicketPrice);
+            cmd.Parameters.AddWithValue("@TotalTickets", dto.TotalTickets);
+            cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
 
             await cmd.ExecuteNonQueryAsync();
+
+            // Regenerate seats if config changed and no bookings exist
+            if (dto.SeatTiers != null && dto.SeatTiers.Any())
+            {
+                var seatService = new SeatService(_db);
+                try
+                {
+                    await seatService.RegenerateSeatsAsync(id, dto.SeatTiers);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Seat regeneration failed due to existing bookings - just update event info
+                    Console.WriteLine($"Warning: Could not regenerate seats: {ex.Message}");
+                }
+            }
 
             return await GetEventByIdAsync(id);
         }
@@ -374,7 +433,7 @@ namespace EventBooking.API.Services
                 AND    OrganizerId = @OrganizerId";
 
             using var cmd = new SqlCommand(query, connection);
-            cmd.Parameters.AddWithValue("@Id",          id);
+            cmd.Parameters.AddWithValue("@Id", id);
             cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
 
             int rows = await cmd.ExecuteNonQueryAsync();
@@ -411,6 +470,7 @@ namespace EventBooking.API.Services
                        (e.TotalTickets - e.BookedTickets) AS AvailableTickets,
                        e.OrganizerId,
                        e.CreatedAt,
+                       e.SeatConfig,
                        u.Name AS OrganizerName
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
@@ -423,9 +483,7 @@ namespace EventBooking.API.Services
             using var reader = await cmd.ExecuteReaderAsync();
 
             while (await reader.ReadAsync())
-            {
                 events.Add(MapReaderToEventDto(reader));
-            }
 
             return events;
         }
@@ -435,26 +493,37 @@ namespace EventBooking.API.Services
         // ─────────────────────────────────────────────
         private static EventDto MapReaderToEventDto(SqlDataReader reader)
         {
+            string categoryString = reader["Category"].ToString()!;
+
+            // ✅ Convert category string back to index for Angular form dropdown
+            int categoryIndex = Array.IndexOf(CategoryNames, categoryString);
+            if (categoryIndex < 0) categoryIndex = 7;
+
+            string? seatConfig = reader["SeatConfig"] == DBNull.Value ? null : reader["SeatConfig"].ToString();
+
             return new EventDto
             {
-                Id               = Convert.ToInt32(reader["Id"]),
-                Title            = reader["Title"].ToString()!,
-                Description      = reader["Description"].ToString()!,
-                Category         = reader["Category"].ToString()!,
-                Status           = reader["Status"].ToString()!,
-                StartDateTime    = ((DateTime)reader["StartDateTime"]).ToString("o"),
-                EndDateTime      = ((DateTime)reader["EndDateTime"]).ToString("o"),
-                Venue            = reader["Venue"].ToString()!,
-                City             = reader["City"].ToString()!,
-                Address          = reader["Address"]  == DBNull.Value ? null : reader["Address"].ToString(),
-                ImageUrl         = reader["ImageUrl"] == DBNull.Value ? null : reader["ImageUrl"].ToString(),
-                TicketPrice      = Convert.ToDecimal(reader["TicketPrice"]),
-                TotalTickets     = Convert.ToInt32(reader["TotalTickets"]),
-                BookedTickets    = Convert.ToInt32(reader["BookedTickets"]),
+                Id = Convert.ToInt32(reader["Id"]),
+                Title = reader["Title"].ToString()!,
+                Description = reader["Description"].ToString()!,
+                Category = categoryString,
+                CategoryIndex = categoryIndex,
+                Status = reader["Status"].ToString()!,
+                StartDateTime = ((DateTime)reader["StartDateTime"]).ToString("o"),
+                EndDateTime = ((DateTime)reader["EndDateTime"]).ToString("o"),
+                Venue = reader["Venue"].ToString()!,
+                City = reader["City"].ToString()!,
+                Address = reader["Address"] == DBNull.Value ? null : reader["Address"].ToString(),
+                ImageUrl = reader["ImageUrl"] == DBNull.Value ? null : reader["ImageUrl"].ToString(),
+                TicketPrice = Convert.ToDecimal(reader["TicketPrice"]),
+                TotalTickets = Convert.ToInt32(reader["TotalTickets"]),
+                BookedTickets = Convert.ToInt32(reader["BookedTickets"]),
                 AvailableTickets = Convert.ToInt32(reader["AvailableTickets"]),
-                OrganizerId      = Convert.ToInt32(reader["OrganizerId"]),
-                OrganizerName    = reader["OrganizerName"].ToString()!,
-                CreatedAt        = ((DateTime)reader["CreatedAt"]).ToString("o")
+                OrganizerId = Convert.ToInt32(reader["OrganizerId"]),
+                OrganizerName = reader["OrganizerName"].ToString()!,
+                CreatedAt = ((DateTime)reader["CreatedAt"]).ToString("o"),
+                HasSeatMap = !string.IsNullOrEmpty(seatConfig),
+                SeatConfig = seatConfig
             };
         }
     }

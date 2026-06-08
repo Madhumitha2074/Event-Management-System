@@ -10,14 +10,16 @@ namespace EventBooking.API.Controllers
     [Route("api/[controller]")]
     public class EventsController : ControllerBase
     {
-        private readonly IEventService   _eventService;
+        private readonly IEventService _eventService;
         private readonly IBookingService _bookingService;
+        private readonly ISeatService _seatService;
 
         // ✅ Both services injected via constructor — consistent and testable
-        public EventsController(IEventService eventService, IBookingService bookingService)
+        public EventsController(IEventService eventService, IBookingService bookingService, ISeatService seatService)
         {
-            _eventService   = eventService;
+            _eventService = eventService;
             _bookingService = bookingService;
+            _seatService = seatService;
         }
 
         // ─────────────────────────────────────────────
@@ -199,6 +201,22 @@ namespace EventBooking.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Failed to retrieve attendees.", detail = ex.Message });
+            }
+        }
+
+        // GET api/events/{id}/seats
+        [HttpGet("{id}/seats")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetEventSeats(int id)
+        {
+            try
+            {
+                var seats = await _seatService.GetSeatsAsync(id);
+                return Ok(seats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Failed to load seats.", detail = ex.Message });
             }
         }
 

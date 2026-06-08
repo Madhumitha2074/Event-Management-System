@@ -68,3 +68,101 @@ body {
   padding: 15px;
   margin-bottom: 10px;
 }
+
+
+
+
+// ─────────────────────────────────────────────
+// NAVBAR HOVER EFFECTS
+// ─────────────────────────────────────────────
+
+.navbar .nav-link {
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  padding: 6px 12px !important;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+    color: white !important;
+  }
+
+  &.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+  }
+}
+
+// Dropdown toggle button hover
+.navbar .dropdown-toggle {
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  padding: 6px 12px !important;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+    color: white !important;
+  }
+}
+
+// Dropdown menu items hover
+.navbar .dropdown-menu {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  margin-top: 8px !important;
+
+  .dropdown-item {
+    border-radius: 8px;
+    padding: 10px 16px;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+
+    &:hover {
+      background-color: #f0eeff;
+      color: #6c5ce7;
+      transform: translateX(4px);
+    }
+
+    &.text-danger:hover {
+      background-color: #fff0f0;
+      color: #d63031 !important;
+    }
+  }
+}
+
+// Navbar brand hover
+.navbar-brand {
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+// Button hover lift effect — applies everywhere
+.btn {
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Card hover lift
+.card {
+  transition: all 0.2s ease;
+}
+
+.event-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+}

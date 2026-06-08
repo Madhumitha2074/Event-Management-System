@@ -60,6 +60,18 @@ namespace EventBooking.API.DTOs
     // EVENT DTOs
     // ─────────────────────────────────────────────
 
+    public class SeatTierConfigDto
+    {
+        [Required]
+        public string Tier { get; set; } = string.Empty;  // Premium | Ordinary | Economy
+        [Range(1, 50)]
+        public int Rows { get; set; }
+        [Range(1, 50)]
+        public int SeatsPerRow { get; set; }
+        [Range(0, 99999)]
+        public decimal Price { get; set; }
+    }
+
     public class CreateEventDto
     {
         [Required(ErrorMessage = "Title is required.")]
@@ -95,6 +107,9 @@ namespace EventBooking.API.DTOs
 
         [Range(1, 100000, ErrorMessage = "Total tickets must be between 1 and 100,000.")]
         public int TotalTickets { get; set; }
+
+        // ✅ NEW — optional seat tier configuration
+        public List<SeatTierConfigDto>? SeatTiers { get; set; }
     }
 
     public class UpdateEventDto : CreateEventDto
@@ -108,6 +123,7 @@ namespace EventBooking.API.DTOs
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+        public int CategoryIndex { get; set; }
         public string Status { get; set; } = string.Empty;
         public string StartDateTime { get; set; } = string.Empty;
         public string EndDateTime { get; set; } = string.Empty;
@@ -122,6 +138,8 @@ namespace EventBooking.API.DTOs
         public string OrganizerName { get; set; } = string.Empty;
         public int OrganizerId { get; set; }
         public string CreatedAt { get; set; } = string.Empty;
+        public bool HasSeatMap { get; set; }
+        public string? SeatConfig { get; set; }  // ADD THIS - JSON string of seat configuration
     }
 
     public class EventFilterDto
@@ -147,6 +165,19 @@ namespace EventBooking.API.DTOs
     }
 
     // ─────────────────────────────────────────────
+    // SEAT DTOs
+    // ─────────────────────────────────────────────
+
+    public class EventSeatDto
+    {
+        public int Id { get; set; }
+        public string SeatNumber { get; set; } = string.Empty;
+        public string Tier { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public bool IsBooked { get; set; }
+    }
+
+    // ─────────────────────────────────────────────
     // BOOKING DTOs
     // ─────────────────────────────────────────────
 
@@ -162,6 +193,21 @@ namespace EventBooking.API.DTOs
 
         [Required(ErrorMessage = "Attendee details are required.")]
         [MinLength(1, ErrorMessage = "At least one attendee is required.")]
+        public List<AttendeeDto> Attendees { get; set; } = new();
+    }
+
+    public class CreateBookingWithSeatsDto
+    {
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int EventId { get; set; }
+
+        [Required]
+        [MinLength(1, ErrorMessage = "Select at least one seat.")]
+        public List<int> SeatIds { get; set; } = new();
+
+        [Required]
+        [MinLength(1)]
         public List<AttendeeDto> Attendees { get; set; } = new();
     }
 
@@ -198,5 +244,8 @@ namespace EventBooking.API.DTOs
         public string AttendeeName { get; set; } = string.Empty;
         public string AttendeeEmail { get; set; } = string.Empty;
         public bool IsUsed { get; set; }
+        public string? SeatNumber { get; set; }
+        public string? Tier { get; set; }
+        public decimal? SeatPrice { get; set; }
     }
 }

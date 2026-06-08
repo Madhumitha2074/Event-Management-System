@@ -26,5 +26,8 @@ namespace EventBooking.API.Models
         public int OrganizerId { get; set; }
         public User Organizer { get; set; } = null!;
         public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+        
+        // NEW: Seat configuration JSON string
+        public string? SeatConfig { get; set; }  // Stores seat tier configuration as JSON
     }
 }

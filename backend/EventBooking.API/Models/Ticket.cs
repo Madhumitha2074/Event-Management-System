@@ -10,5 +10,10 @@ namespace EventBooking.API.Models
         public string AttendeeEmail { get; set; } = string.Empty;
         public bool IsUsed { get; set; } = false;
         public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
+        // NEW: Add this property for seat mapping
+        public int? SeatId { get; set; }  // Nullable because not all tickets have assigned seats
+
+        // Navigation property (optional)
+        public EventSeat? Seat { get; set; }
     }
 }

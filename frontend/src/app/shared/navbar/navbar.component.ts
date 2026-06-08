@@ -22,53 +22,45 @@ import { AuthResponse } from '../../core/models/models';
         <div class="collapse navbar-collapse" id="navMenu">
           <ul class="navbar-nav me-auto">
             <li class="nav-item">
-              <a
-                class="nav-link"
-                routerLink="/"
-                routerLinkActive="active"
-                [routerLinkActiveOptions]="{ exact: true }">
+              <a class="nav-link"
+                 routerLink="/"
+                 routerLinkActive="active"
+                 [routerLinkActiveOptions]="{ exact: true }">
                 Events
               </a>
             </li>
 
             <li class="nav-item" *ngIf="isLoggedIn">
-              <a class="nav-link" routerLink="/bookings">
-                My Bookings
-              </a>
+              <a class="nav-link" routerLink="/bookings">My Bookings</a>
             </li>
 
             <li class="nav-item" *ngIf="isOrganizer">
-              <a class="nav-link" routerLink="/organizer">
-                Dashboard
-              </a>
+              <a class="nav-link" routerLink="/organizer">Dashboard</a>
             </li>
           </ul>
 
           <ul class="navbar-nav ms-auto">
+
+            <!-- Not logged in -->
             <ng-container *ngIf="!isLoggedIn">
               <li class="nav-item">
-                <a class="nav-link" routerLink="/auth/login">
-                  Login
-                </a>
+                <a class="nav-link" routerLink="/auth/login">Login</a>
               </li>
-
               <li class="nav-item">
-                <a
-                  class="btn btn-light btn-sm ms-2"
-                  routerLink="/auth/register">
+                <a class="btn btn-light btn-sm ms-2" routerLink="/auth/register">
                   Register
                 </a>
               </li>
             </ng-container>
 
+            <!-- Logged in -->
             <ng-container *ngIf="isLoggedIn">
               <li class="nav-item dropdown">
-                <a
-                  class="nav-link dropdown-toggle"
-                  href="#"
-                  id="userMenu"
-                  role="button"
-                  data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle"
+                   href="#"
+                   id="userMenu"
+                   role="button"
+                   data-bs-toggle="dropdown">
                   <i class="fas fa-user-circle me-1"></i>
                   {{ currentUser?.name }}
                 </a>
@@ -76,35 +68,30 @@ import { AuthResponse } from '../../core/models/models';
                 <ul class="dropdown-menu dropdown-menu-end">
 
                   <li>
-                    <a class="dropdown-item" routerLink="/profile">
-                      <i class="fas fa-user me-2"></i>
-                      My Profile
+                    <!-- ✅ Fixed: /auth/profile not /profile -->
+                    <a class="dropdown-item" routerLink="/auth/profile">
+                      <i class="fas fa-user me-2"></i>My Profile
                     </a>
                   </li>
 
                   <li>
                     <a class="dropdown-item" routerLink="/bookings">
-                      <i class="fas fa-ticket-alt me-2"></i>
-                      My Bookings
+                      <i class="fas fa-ticket-alt me-2"></i>My Bookings
                     </a>
                   </li>
 
-                  <li>
-                    <hr class="dropdown-divider">
-                  </li>
+                  <li><hr class="dropdown-divider"></li>
 
                   <li>
-                    <a
-                      class="dropdown-item text-danger"
-                      (click)="logout()">
-                      <i class="fas fa-sign-out-alt me-2"></i>
-                      Logout
+                    <a class="dropdown-item text-danger" (click)="logout()">
+                      <i class="fas fa-sign-out-alt me-2"></i>Logout
                     </a>
                   </li>
 
                 </ul>
               </li>
             </ng-container>
+
           </ul>
         </div>
       </div>
@@ -113,7 +100,7 @@ import { AuthResponse } from '../../core/models/models';
 })
 export class NavbarComponent implements OnInit {
   currentUser: AuthResponse | null = null;
-  isLoggedIn = false;
+  isLoggedIn  = false;
   isOrganizer = false;
 
   constructor(private authService: AuthService) {}
@@ -121,10 +108,8 @@ export class NavbarComponent implements OnInit {
   ngOnInit(): void {
     this.authService.currentUser$.subscribe(user => {
       this.currentUser = user;
-      this.isLoggedIn = !!user;
-      this.isOrganizer =
-        user?.role === 'Organizer' ||
-        user?.role === 'Admin';
+      this.isLoggedIn  = !!user;
+      this.isOrganizer = user?.role === 'Organizer' || user?.role === 'Admin';
     });
   }
 

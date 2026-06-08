@@ -7,6 +7,9 @@ namespace EventBooking.API.Services
     public interface IBookingService
     {
         Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int userId);
+
+        // NEW: Create booking with specific seats
+        Task<BookingDto> CreateBookingWithSeatsAsync(CreateBookingWithSeatsDto dto, int userId);
         Task<List<BookingDto>> GetUserBookingsAsync(int userId);
         Task<BookingDto> GetBookingByIdAsync(int id, int userId);
         Task CancelBookingAsync(int id, int userId);
@@ -17,14 +20,14 @@ namespace EventBooking.API.Services
     public class BookingService : IBookingService
     {
         private readonly DatabaseHelper _db;
-        private readonly IEmailService  _emailService;
-        private readonly PdfService     _pdfService;
+        private readonly IEmailService _emailService;
+        private readonly PdfService _pdfService;
 
         public BookingService(DatabaseHelper db, IEmailService emailService)
         {
-            _db           = db;
+            _db = db;
             _emailService = emailService;
-            _pdfService   = new PdfService();
+            _pdfService = new PdfService();
         }
 
         // ─────────────────────────────────────────────
@@ -46,10 +49,10 @@ namespace EventBooking.API.Services
             {
                 // ── Step 1: Get event details + check availability ──────────
                 decimal ticketPrice;
-                int     availableTickets;
-                string  eventTitle;
-                string  eventVenue;
-                string  eventStartDateTime;
+                int availableTickets;
+                string eventTitle;
+                string eventVenue;
+                string eventStartDateTime;
 
                 string eventQuery = @"
                     SELECT TicketPrice, (TotalTickets - BookedTickets) AS AvailableTickets,
@@ -66,11 +69,11 @@ namespace EventBooking.API.Services
                     if (!await eventReader.ReadAsync())
                         throw new KeyNotFoundException("Event not found or not published.");
 
-                    ticketPrice         = Convert.ToDecimal(eventReader["TicketPrice"]);
-                    availableTickets    = Convert.ToInt32(eventReader["AvailableTickets"]);
-                    eventTitle          = eventReader["Title"].ToString()!;
-                    eventVenue          = eventReader["Venue"].ToString()!;
-                    eventStartDateTime  = ((DateTime)eventReader["StartDateTime"]).ToString("o");
+                    ticketPrice = Convert.ToDecimal(eventReader["TicketPrice"]);
+                    availableTickets = Convert.ToInt32(eventReader["AvailableTickets"]);
+                    eventTitle = eventReader["Title"].ToString()!;
+                    eventVenue = eventReader["Venue"].ToString()!;
+                    eventStartDateTime = ((DateTime)eventReader["StartDateTime"]).ToString("o");
                 }
 
                 // ✅ Check availability BEFORE booking
@@ -78,8 +81,8 @@ namespace EventBooking.API.Services
                     throw new InvalidOperationException(
                         $"Only {availableTickets} ticket(s) available.");
 
-                decimal totalAmount      = ticketPrice * dto.TicketCount;
-                string  bookingReference = GenerateReference();
+                decimal totalAmount = ticketPrice * dto.TicketCount;
+                string bookingReference = GenerateReference();
 
                 // ── Step 2: Insert Booking ──────────────────────────────────
                 int bookingId;
@@ -94,13 +97,13 @@ namespace EventBooking.API.Services
                 using (var bookingCmd = new SqlCommand(insertBookingQuery, connection, transaction))
                 {
                     bookingCmd.Parameters.AddWithValue("@BookingReference", bookingReference);
-                    bookingCmd.Parameters.AddWithValue("@UserId",           userId);
-                    bookingCmd.Parameters.AddWithValue("@EventId",          dto.EventId);
-                    bookingCmd.Parameters.AddWithValue("@TicketCount",      dto.TicketCount);
-                    bookingCmd.Parameters.AddWithValue("@TotalAmount",      totalAmount);
+                    bookingCmd.Parameters.AddWithValue("@UserId", userId);
+                    bookingCmd.Parameters.AddWithValue("@EventId", dto.EventId);
+                    bookingCmd.Parameters.AddWithValue("@TicketCount", dto.TicketCount);
+                    bookingCmd.Parameters.AddWithValue("@TotalAmount", totalAmount);
 
                     var scalar = await bookingCmd.ExecuteScalarAsync();
-                    bookingId  = Convert.ToInt32(scalar);
+                    bookingId = Convert.ToInt32(scalar);
                 }
 
                 // ── Step 3: Insert Tickets (one per attendee) ───────────────
@@ -119,21 +122,21 @@ namespace EventBooking.API.Services
 
                     using var ticketCmd = new SqlCommand(insertTicketQuery, connection, transaction);
 
-                    ticketCmd.Parameters.AddWithValue("@TicketNumber",  ticketNumber);
-                    ticketCmd.Parameters.AddWithValue("@BookingId",     bookingId);
-                    ticketCmd.Parameters.AddWithValue("@AttendeeName",  attendee.Name.Trim());
+                    ticketCmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
+                    ticketCmd.Parameters.AddWithValue("@BookingId", bookingId);
+                    ticketCmd.Parameters.AddWithValue("@AttendeeName", attendee.Name.Trim());
                     ticketCmd.Parameters.AddWithValue("@AttendeeEmail", attendee.Email.Trim().ToLower());
 
                     var ticketScalar = await ticketCmd.ExecuteScalarAsync();
-                    int ticketId     = Convert.ToInt32(ticketScalar);
+                    int ticketId = Convert.ToInt32(ticketScalar);
 
                     ticketDtos.Add(new TicketDto
                     {
-                        Id            = ticketId,
-                        TicketNumber  = ticketNumber,
-                        AttendeeName  = attendee.Name.Trim(),
+                        Id = ticketId,
+                        TicketNumber = ticketNumber,
+                        AttendeeName = attendee.Name.Trim(),
                         AttendeeEmail = attendee.Email.Trim().ToLower(),
-                        IsUsed        = false
+                        IsUsed = false
                     });
                 }
 
@@ -145,7 +148,7 @@ namespace EventBooking.API.Services
 
                 using (var updateCmd = new SqlCommand(updateEventQuery, connection, transaction))
                 {
-                    updateCmd.Parameters.AddWithValue("@Count",   dto.TicketCount);
+                    updateCmd.Parameters.AddWithValue("@Count", dto.TicketCount);
                     updateCmd.Parameters.AddWithValue("@EventId", dto.EventId);
                     await updateCmd.ExecuteNonQueryAsync();
                 }
@@ -159,22 +162,210 @@ namespace EventBooking.API.Services
                 // ── Step 7: Return the full booking DTO ─────────────────────
                 return new BookingDto
                 {
-                    Id                 = bookingId,
-                    BookingReference   = bookingReference,
-                    EventId            = dto.EventId,
-                    EventTitle         = eventTitle,
-                    EventVenue         = eventVenue,
+                    Id = bookingId,
+                    BookingReference = bookingReference,
+                    EventId = dto.EventId,
+                    EventTitle = eventTitle,
+                    EventVenue = eventVenue,
                     EventStartDateTime = eventStartDateTime,
-                    TicketCount        = dto.TicketCount,
-                    TotalAmount        = totalAmount,
-                    Status             = "Confirmed",
-                    BookedAt           = DateTime.UtcNow.ToString("o"),
-                    Tickets            = ticketDtos
+                    TicketCount = dto.TicketCount,
+                    TotalAmount = totalAmount,
+                    Status = "Confirmed",
+                    BookedAt = DateTime.UtcNow.ToString("o"),
+                    Tickets = ticketDtos
                 };
             }
             catch
             {
                 // ✅ Roll back everything if any step throws
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        // Add this implementation to BookingService class
+        public async Task<BookingDto> CreateBookingWithSeatsAsync(CreateBookingWithSeatsDto dto, int userId)
+        {
+            // Validate attendees count matches seat count
+            if (dto.Attendees == null || dto.Attendees.Count != dto.SeatIds.Count)
+                throw new ArgumentException("Number of attendees must match number of seats selected.");
+
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            using var transaction = connection.BeginTransaction();
+
+            try
+            {
+                // Step 1: Get event details
+                decimal ticketPrice;
+                int availableTickets;
+                string eventTitle;
+                string eventVenue;
+                string eventStartDateTime;
+                decimal totalAmount = 0;
+
+                string eventQuery = @"
+            SELECT TicketPrice, (TotalTickets - BookedTickets) AS AvailableTickets,
+                   Title, Venue, StartDateTime
+            FROM   Events
+            WHERE  Id = @EventId AND Status = 'Published'";
+
+                using (var eventCmd = new SqlCommand(eventQuery, connection, transaction))
+                {
+                    eventCmd.Parameters.AddWithValue("@EventId", dto.EventId);
+
+                    using var eventReader = await eventCmd.ExecuteReaderAsync();
+
+                    if (!await eventReader.ReadAsync())
+                        throw new KeyNotFoundException("Event not found or not published.");
+
+                    ticketPrice = Convert.ToDecimal(eventReader["TicketPrice"]);
+                    availableTickets = Convert.ToInt32(eventReader["AvailableTickets"]);
+                    eventTitle = eventReader["Title"].ToString()!;
+                    eventVenue = eventReader["Venue"].ToString()!;
+                    eventStartDateTime = ((DateTime)eventReader["StartDateTime"]).ToString("o");
+                }
+
+                // Step 2: Verify seats are available and lock them
+                string seatCheckQuery = @"
+            SELECT Id, Price FROM EventSeats
+            WHERE Id IN ({0}) AND EventId = @EventId AND IsBooked = 0
+            FOR UPDATE";
+
+                var seatIdsParam = string.Join(",", dto.SeatIds);
+                var seatPrices = new Dictionary<int, decimal>();
+
+                using (var seatCmd = new SqlCommand(
+                    string.Format(seatCheckQuery, seatIdsParam), connection, transaction))
+                {
+                    seatCmd.Parameters.AddWithValue("@EventId", dto.EventId);
+
+                    using var seatReader = await seatCmd.ExecuteReaderAsync();
+
+                    var foundSeats = new HashSet<int>();
+                    while (await seatReader.ReadAsync())
+                    {
+                        int seatId = Convert.ToInt32(seatReader["Id"]);
+                        foundSeats.Add(seatId);
+                        seatPrices[seatId] = Convert.ToDecimal(seatReader["Price"]);
+                    }
+
+                    // Check if all requested seats exist and are available
+                    foreach (var seatId in dto.SeatIds)
+                    {
+                        if (!foundSeats.Contains(seatId))
+                            throw new InvalidOperationException($"Seat {seatId} is not available.");
+                        totalAmount += seatPrices[seatId];
+                    }
+                }
+
+                // Step 3: Create booking
+                string bookingReference = GenerateReference();
+                int bookingId;
+
+                string insertBookingQuery = @"
+            INSERT INTO Bookings
+                (BookingReference, UserId, EventId, TicketCount, TotalAmount, Status)
+            OUTPUT INSERTED.Id
+            VALUES
+                (@BookingReference, @UserId, @EventId, @TicketCount, @TotalAmount, 'Confirmed')";
+
+                using (var bookingCmd = new SqlCommand(insertBookingQuery, connection, transaction))
+                {
+                    bookingCmd.Parameters.AddWithValue("@BookingReference", bookingReference);
+                    bookingCmd.Parameters.AddWithValue("@UserId", userId);
+                    bookingCmd.Parameters.AddWithValue("@EventId", dto.EventId);
+                    bookingCmd.Parameters.AddWithValue("@TicketCount", dto.SeatIds.Count);
+                    bookingCmd.Parameters.AddWithValue("@TotalAmount", totalAmount);
+
+                    var scalar = await bookingCmd.ExecuteScalarAsync();
+                    bookingId = Convert.ToInt32(scalar);
+                }
+
+                // Step 4: Create tickets and mark seats as booked
+                var ticketDtos = new List<TicketDto>();
+
+                for (int i = 0; i < dto.SeatIds.Count; i++)
+                {
+                    int seatId = dto.SeatIds[i];
+                    var attendee = dto.Attendees[i];
+                    string ticketNumber = GenerateTicketNumber();
+
+                    // Insert ticket
+                    string insertTicketQuery = @"
+                INSERT INTO Tickets
+                    (TicketNumber, BookingId, AttendeeName, AttendeeEmail, SeatId)
+                OUTPUT INSERTED.Id
+                VALUES
+                    (@TicketNumber, @BookingId, @AttendeeName, @AttendeeEmail, @SeatId)";
+
+                    using var ticketCmd = new SqlCommand(insertTicketQuery, connection, transaction);
+                    ticketCmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
+                    ticketCmd.Parameters.AddWithValue("@BookingId", bookingId);
+                    ticketCmd.Parameters.AddWithValue("@AttendeeName", attendee.Name.Trim());
+                    ticketCmd.Parameters.AddWithValue("@AttendeeEmail", attendee.Email.Trim().ToLower());
+                    ticketCmd.Parameters.AddWithValue("@SeatId", seatId);
+
+                    var ticketScalar = await ticketCmd.ExecuteScalarAsync();
+                    int ticketId = Convert.ToInt32(ticketScalar);
+
+                    // Mark seat as booked
+                    string updateSeatQuery = @"
+                UPDATE EventSeats
+                SET IsBooked = 1, TicketId = @TicketId
+                WHERE Id = @SeatId";
+
+                    using var updateSeatCmd = new SqlCommand(updateSeatQuery, connection, transaction);
+                    updateSeatCmd.Parameters.AddWithValue("@TicketId", ticketId);
+                    updateSeatCmd.Parameters.AddWithValue("@SeatId", seatId);
+                    await updateSeatCmd.ExecuteNonQueryAsync();
+
+                    ticketDtos.Add(new TicketDto
+                    {
+                        Id = ticketId,
+                        TicketNumber = ticketNumber,
+                        AttendeeName = attendee.Name.Trim(),
+                        AttendeeEmail = attendee.Email.Trim().ToLower(),
+                        IsUsed = false
+                    });
+                }
+
+                // Step 5: Increment BookedTickets on Events
+                string updateEventQuery = @"
+            UPDATE Events
+            SET    BookedTickets = BookedTickets + @Count
+            WHERE  Id = @EventId";
+
+                using (var updateCmd = new SqlCommand(updateEventQuery, connection, transaction))
+                {
+                    updateCmd.Parameters.AddWithValue("@Count", dto.SeatIds.Count);
+                    updateCmd.Parameters.AddWithValue("@EventId", dto.EventId);
+                    await updateCmd.ExecuteNonQueryAsync();
+                }
+
+                await transaction.CommitAsync();
+
+                // Send confirmation email
+                await _emailService.SendBookingConfirmationAsync(bookingId);
+
+                return new BookingDto
+                {
+                    Id = bookingId,
+                    BookingReference = bookingReference,
+                    EventId = dto.EventId,
+                    EventTitle = eventTitle,
+                    EventVenue = eventVenue,
+                    EventStartDateTime = eventStartDateTime,
+                    TicketCount = dto.SeatIds.Count,
+                    TotalAmount = totalAmount,
+                    Status = "Confirmed",
+                    BookedAt = DateTime.UtcNow.ToString("o"),
+                    Tickets = ticketDtos
+                };
+            }
+            catch
+            {
                 await transaction.RollbackAsync();
                 throw;
             }
@@ -209,17 +400,17 @@ namespace EventBooking.API.Services
             {
                 bookings.Add(new BookingDto
                 {
-                    Id                 = Convert.ToInt32(reader["Id"]),
-                    BookingReference   = reader["BookingReference"].ToString()!,
-                    EventId            = Convert.ToInt32(reader["EventId"]),
-                    EventTitle         = reader["EventTitle"].ToString()!,
-                    EventVenue         = reader["EventVenue"].ToString()!,
+                    Id = Convert.ToInt32(reader["Id"]),
+                    BookingReference = reader["BookingReference"].ToString()!,
+                    EventId = Convert.ToInt32(reader["EventId"]),
+                    EventTitle = reader["EventTitle"].ToString()!,
+                    EventVenue = reader["EventVenue"].ToString()!,
                     EventStartDateTime = ((DateTime)reader["EventStartDateTime"]).ToString("o"),
-                    TicketCount        = Convert.ToInt32(reader["TicketCount"]),
-                    TotalAmount        = Convert.ToDecimal(reader["TotalAmount"]),
-                    Status             = reader["Status"].ToString()!,
-                    BookedAt           = ((DateTime)reader["BookedAt"]).ToString("o"),
-                    Tickets            = new List<TicketDto>()   // tickets loaded separately in GetById
+                    TicketCount = Convert.ToInt32(reader["TicketCount"]),
+                    TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                    Status = reader["Status"].ToString()!,
+                    BookedAt = ((DateTime)reader["BookedAt"]).ToString("o"),
+                    Tickets = new List<TicketDto>()   // tickets loaded separately in GetById
                 });
             }
 
@@ -248,7 +439,7 @@ namespace EventBooking.API.Services
 
             using (var bookingCmd = new SqlCommand(bookingQuery, connection))
             {
-                bookingCmd.Parameters.AddWithValue("@Id",     id);
+                bookingCmd.Parameters.AddWithValue("@Id", id);
                 bookingCmd.Parameters.AddWithValue("@UserId", userId);
 
                 using var reader = await bookingCmd.ExecuteReaderAsync();
@@ -258,17 +449,17 @@ namespace EventBooking.API.Services
 
                 booking = new BookingDto
                 {
-                    Id                 = Convert.ToInt32(reader["Id"]),
-                    BookingReference   = reader["BookingReference"].ToString()!,
-                    EventId            = Convert.ToInt32(reader["EventId"]),
-                    EventTitle         = reader["EventTitle"].ToString()!,
-                    EventVenue         = reader["EventVenue"].ToString()!,
+                    Id = Convert.ToInt32(reader["Id"]),
+                    BookingReference = reader["BookingReference"].ToString()!,
+                    EventId = Convert.ToInt32(reader["EventId"]),
+                    EventTitle = reader["EventTitle"].ToString()!,
+                    EventVenue = reader["EventVenue"].ToString()!,
                     EventStartDateTime = ((DateTime)reader["EventStartDateTime"]).ToString("o"),
-                    TicketCount        = Convert.ToInt32(reader["TicketCount"]),
-                    TotalAmount        = Convert.ToDecimal(reader["TotalAmount"]),
-                    Status             = reader["Status"].ToString()!,
-                    BookedAt           = ((DateTime)reader["BookedAt"]).ToString("o"),
-                    Tickets            = new List<TicketDto>()
+                    TicketCount = Convert.ToInt32(reader["TicketCount"]),
+                    TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                    Status = reader["Status"].ToString()!,
+                    BookedAt = ((DateTime)reader["BookedAt"]).ToString("o"),
+                    Tickets = new List<TicketDto>()
                 };
             }
 
@@ -288,11 +479,11 @@ namespace EventBooking.API.Services
                 {
                     booking.Tickets.Add(new TicketDto
                     {
-                        Id            = Convert.ToInt32(ticketReader["Id"]),
-                        TicketNumber  = ticketReader["TicketNumber"].ToString()!,
-                        AttendeeName  = ticketReader["AttendeeName"].ToString()!,
+                        Id = Convert.ToInt32(ticketReader["Id"]),
+                        TicketNumber = ticketReader["TicketNumber"].ToString()!,
+                        AttendeeName = ticketReader["AttendeeName"].ToString()!,
                         AttendeeEmail = ticketReader["AttendeeEmail"].ToString()!,
-                        IsUsed        = Convert.ToBoolean(ticketReader["IsUsed"])
+                        IsUsed = Convert.ToBoolean(ticketReader["IsUsed"])
                     });
                 }
             }
@@ -313,8 +504,8 @@ namespace EventBooking.API.Services
             try
             {
                 // ── Step 1: Get booking details before cancelling ───────────
-                int    eventId;
-                int    ticketCount;
+                int eventId;
+                int ticketCount;
                 string currentStatus;
 
                 string selectQuery = @"
@@ -324,7 +515,7 @@ namespace EventBooking.API.Services
 
                 using (var selectCmd = new SqlCommand(selectQuery, connection, transaction))
                 {
-                    selectCmd.Parameters.AddWithValue("@Id",     id);
+                    selectCmd.Parameters.AddWithValue("@Id", id);
                     selectCmd.Parameters.AddWithValue("@UserId", userId);
 
                     using var reader = await selectCmd.ExecuteReaderAsync();
@@ -337,7 +528,7 @@ namespace EventBooking.API.Services
                     if (currentStatus == "Cancelled")
                         throw new InvalidOperationException("Booking is already cancelled.");
 
-                    eventId     = Convert.ToInt32(reader["EventId"]);
+                    eventId = Convert.ToInt32(reader["EventId"]);
                     ticketCount = Convert.ToInt32(reader["TicketCount"]);
                 }
 
@@ -350,8 +541,8 @@ namespace EventBooking.API.Services
                 using (var cancelCmd = new SqlCommand(cancelQuery, connection, transaction))
                 {
                     cancelCmd.Parameters.AddWithValue("@CancelledAt", DateTime.UtcNow);
-                    cancelCmd.Parameters.AddWithValue("@Id",          id);
-                    cancelCmd.Parameters.AddWithValue("@UserId",      userId);
+                    cancelCmd.Parameters.AddWithValue("@Id", id);
+                    cancelCmd.Parameters.AddWithValue("@UserId", userId);
                     await cancelCmd.ExecuteNonQueryAsync();
                 }
 
@@ -363,7 +554,7 @@ namespace EventBooking.API.Services
 
                 using (var restoreCmd = new SqlCommand(restoreQuery, connection, transaction))
                 {
-                    restoreCmd.Parameters.AddWithValue("@Count",   ticketCount);
+                    restoreCmd.Parameters.AddWithValue("@Count", ticketCount);
                     restoreCmd.Parameters.AddWithValue("@EventId", eventId);
                     await restoreCmd.ExecuteNonQueryAsync();
                 }
@@ -397,7 +588,7 @@ namespace EventBooking.API.Services
 
             using (var checkCmd = new SqlCommand(ownerCheck, connection))
             {
-                checkCmd.Parameters.AddWithValue("@EventId",     eventId);
+                checkCmd.Parameters.AddWithValue("@EventId", eventId);
                 checkCmd.Parameters.AddWithValue("@OrganizerId", organizerId);
 
                 int count = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
@@ -424,17 +615,17 @@ namespace EventBooking.API.Services
             {
                 bookings.Add(new BookingDto
                 {
-                    Id                 = Convert.ToInt32(reader["Id"]),
-                    BookingReference   = reader["BookingReference"].ToString()!,
-                    EventId            = Convert.ToInt32(reader["EventId"]),
-                    EventTitle         = reader["EventTitle"].ToString()!,
-                    EventVenue         = reader["EventVenue"].ToString()!,
+                    Id = Convert.ToInt32(reader["Id"]),
+                    BookingReference = reader["BookingReference"].ToString()!,
+                    EventId = Convert.ToInt32(reader["EventId"]),
+                    EventTitle = reader["EventTitle"].ToString()!,
+                    EventVenue = reader["EventVenue"].ToString()!,
                     EventStartDateTime = ((DateTime)reader["EventStartDateTime"]).ToString("o"),
-                    TicketCount        = Convert.ToInt32(reader["TicketCount"]),
-                    TotalAmount        = Convert.ToDecimal(reader["TotalAmount"]),
-                    Status             = reader["Status"].ToString()!,
-                    BookedAt           = ((DateTime)reader["BookedAt"]).ToString("o"),
-                    Tickets            = new List<TicketDto>()
+                    TicketCount = Convert.ToInt32(reader["TicketCount"]),
+                    TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                    Status = reader["Status"].ToString()!,
+                    BookedAt = ((DateTime)reader["BookedAt"]).ToString("o"),
+                    Tickets = new List<TicketDto>()
                 });
             }
 

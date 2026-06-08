@@ -55,6 +55,42 @@ namespace EventBooking.API.Controllers
         }
 
         // ─────────────────────────────────────────────
+        // POST api/bookings/with-seats  (NEW - seat-based booking)
+        // ─────────────────────────────────────────────
+        [HttpPost("with-seats")]
+        public async Task<IActionResult> CreateBookingWithSeats([FromBody] CreateBookingWithSeatsDto dto)
+        {
+            // ✅ Safe token claim parse
+            if (!TryGetUserId(out int userId))
+                return Unauthorized(new { message = "Invalid token." });
+
+            try
+            {
+                var booking = await _bookingService.CreateBookingWithSeatsAsync(dto, userId);
+                return CreatedAtAction(nameof(GetBooking), new { id = booking.Id }, booking);
+            }
+            catch (ArgumentException ex)
+            {
+                // Attendees count mismatch or invalid date
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                // Event not found or seat not found
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Not enough tickets available or seat already booked
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Failed to create booking.", detail = ex.Message });
+            }
+        }
+
+        // ─────────────────────────────────────────────
         // GET api/bookings
         // ─────────────────────────────────────────────
         [HttpGet]
@@ -165,10 +201,6 @@ namespace EventBooking.API.Controllers
             var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return !string.IsNullOrWhiteSpace(claim) && int.TryParse(claim, out userId);
         }
-
-
-
-
 
         [HttpGet("whoami")]
         public IActionResult WhoAmI()
