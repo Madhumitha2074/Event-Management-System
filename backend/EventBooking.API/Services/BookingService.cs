@@ -184,9 +184,9 @@ namespace EventBooking.API.Services
             }
         }
 
-        // Add this implementation to BookingService class
-        // In BookingService.cs - Replace the entire CreateBookingWithSeatsAsync method
-
+        // ─────────────────────────────────────────────
+        // CREATE BOOKING WITH SEATS (Stored Procedure)
+        // ─────────────────────────────────────────────
         public async Task<BookingDto> CreateBookingWithSeatsAsync(CreateBookingWithSeatsDto dto, int userId)
         {
             // Validate attendees count matches seat count
@@ -296,7 +296,7 @@ namespace EventBooking.API.Services
                     TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
                     Status = reader["Status"].ToString()!,
                     BookedAt = ((DateTime)reader["BookedAt"]).ToString("o"),
-                    Tickets = new List<TicketDto>()   // tickets loaded separately in GetById
+                    Tickets = new List<TicketDto>()
                 });
             }
 
@@ -304,7 +304,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // GET BOOKING BY ID  (includes tickets)
+        // GET BOOKING BY ID (includes tickets)
         // ─────────────────────────────────────────────
         public async Task<BookingDto> GetBookingByIdAsync(int id, int userId)
         {
@@ -458,12 +458,10 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // GET EVENT BOOKINGS  (organizer view)
+        // GET EVENT BOOKINGS (Organizer view with tickets)
         // ─────────────────────────────────────────────
         public async Task<List<BookingDto>> GetEventBookingsAsync(int eventId, int organizerId)
         {
-            var bookings = new List<BookingDto>();
-
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
@@ -482,40 +480,63 @@ namespace EventBooking.API.Services
                     throw new UnauthorizedAccessException("You do not own this event.");
             }
 
+            // Get bookings with tickets
             string query = @"
                 SELECT b.Id, b.BookingReference, b.EventId,
                        b.TicketCount, b.TotalAmount, b.Status, b.BookedAt,
                        e.Title AS EventTitle, e.Venue AS EventVenue,
-                       e.StartDateTime AS EventStartDateTime
-                FROM   Bookings b
+                       e.StartDateTime AS EventStartDateTime,
+                       t.Id AS TicketId, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, t.IsUsed
+                FROM Bookings b
                 INNER JOIN Events e ON b.EventId = e.Id
-                WHERE  b.EventId = @EventId
-                ORDER  BY b.BookedAt DESC";
+                LEFT JOIN Tickets t ON b.Id = t.BookingId
+                WHERE b.EventId = @EventId
+                ORDER BY b.BookedAt DESC, t.Id";
 
             using var cmd = new SqlCommand(query, connection);
             cmd.Parameters.AddWithValue("@EventId", eventId);
 
             using var reader = await cmd.ExecuteReaderAsync();
+            
+            var bookingDict = new Dictionary<int, BookingDto>();
 
             while (await reader.ReadAsync())
             {
-                bookings.Add(new BookingDto
+                int bookingId = Convert.ToInt32(reader["Id"]);
+                
+                if (!bookingDict.ContainsKey(bookingId))
                 {
-                    Id = Convert.ToInt32(reader["Id"]),
-                    BookingReference = reader["BookingReference"].ToString()!,
-                    EventId = Convert.ToInt32(reader["EventId"]),
-                    EventTitle = reader["EventTitle"].ToString()!,
-                    EventVenue = reader["EventVenue"].ToString()!,
-                    EventStartDateTime = ((DateTime)reader["EventStartDateTime"]).ToString("o"),
-                    TicketCount = Convert.ToInt32(reader["TicketCount"]),
-                    TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
-                    Status = reader["Status"].ToString()!,
-                    BookedAt = ((DateTime)reader["BookedAt"]).ToString("o"),
-                    Tickets = new List<TicketDto>()
-                });
+                    bookingDict.Add(bookingId, new BookingDto
+                    {
+                        Id = bookingId,
+                        BookingReference = reader["BookingReference"].ToString()!,
+                        EventId = Convert.ToInt32(reader["EventId"]),
+                        EventTitle = reader["EventTitle"].ToString()!,
+                        EventVenue = reader["EventVenue"].ToString()!,
+                        EventStartDateTime = ((DateTime)reader["EventStartDateTime"]).ToString("o"),
+                        TicketCount = Convert.ToInt32(reader["TicketCount"]),
+                        TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                        Status = reader["Status"].ToString()!,
+                        BookedAt = ((DateTime)reader["BookedAt"]).ToString("o"),
+                        Tickets = new List<TicketDto>()
+                    });
+                }
+                
+                // Add ticket if exists
+                if (reader["TicketId"] != DBNull.Value)
+                {
+                    bookingDict[bookingId].Tickets.Add(new TicketDto
+                    {
+                        Id = Convert.ToInt32(reader["TicketId"]),
+                        TicketNumber = reader["TicketNumber"].ToString()!,
+                        AttendeeName = reader["AttendeeName"].ToString()!,
+                        AttendeeEmail = reader["AttendeeEmail"].ToString()!,
+                        IsUsed = Convert.ToBoolean(reader["IsUsed"])
+                    });
+                }
             }
 
-            return bookings;
+            return bookingDict.Values.ToList();
         }
 
         // ─────────────────────────────────────────────

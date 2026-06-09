@@ -121,30 +121,32 @@ export interface SeatSelection {
     .seat-map-wrap {
       font-family: 'Segoe UI', sans-serif;
       user-select: none;
+      width: 100%;
+      overflow-x: auto;
     }
 
     /* ── Legend ─────────────────────────────────────────────── */
     .seat-legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 16px;
-      padding: 10px 14px;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding: 12px 20px;
       background: #f8f9fa;
-      border-radius: 8px;
+      border-radius: 12px;
     }
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 0.78rem;
+      gap: 8px;
+      font-size: 0.85rem;
       color: #444;
       font-weight: 500;
     }
     .legend-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
       border: 2px solid transparent;
       display: inline-block;
     }
@@ -158,10 +160,9 @@ export interface SeatSelection {
       background: linear-gradient(90deg, #343a40, #495057);
       color: #f8f9fa;
       text-align: center;
-      padding: 10px;
-      border-radius: 8px 8px 0 0;
-      font-size: 0.85rem;
-      letter-spacing: 0.1em;
+      padding: 12px;
+      border-radius: 10px 10px 0 0;
+      font-size: 0.9rem;
       font-weight: 600;
       margin-bottom: 0;
     }
@@ -170,83 +171,95 @@ export interface SeatSelection {
     .sections-wrap {
       border: 1px solid #dee2e6;
       border-top: none;
-      border-radius: 0 0 8px 8px;
+      border-radius: 0 0 12px 12px;
       overflow: hidden;
-      margin-bottom: 16px;
     }
-    .seat-section { border-top: 1px solid #dee2e6; }
+    
+    .seat-section {
+      border-top: 1px solid #dee2e6;
+      padding: 20px;
+    }
     .seat-section:first-child { border-top: none; }
 
     .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 7px 16px;
+      padding: 12px 24px;
+      margin-bottom: 20px;
+      border-radius: 10px;
       font-weight: 700;
-      font-size: 0.82rem;
-      letter-spacing: 0.06em;
+      font-size: 1rem;
     }
-    .section-title { text-transform: uppercase; }
-    .section-price { font-weight: 500; font-size: 0.8rem; opacity: 0.85; }
-
-    /* ── Rows ────────────────────────────────────────────────── */
-    .rows-wrap { padding: 12px 8px; background: #fff; }
+    
+    .rows-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
     .seat-row {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 6px;
-      margin-bottom: 6px;
+      justify-content: flex-start;
+      gap: 10px;
     }
+    
     .row-label {
-      width: 32px;
+      width: 45px;
       text-align: center;
-      font-size: 0.7rem;
+      font-size: 0.9rem;
       font-weight: 700;
       color: #6c757d;
     }
+    
     .seats-in-row {
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
-      gap: 4px;
+      gap: 8px;
+      flex: 1;
     }
 
-    /* ── Seat button ─────────────────────────────────────────── */
+    /* ── Seat buttons - larger and more visible ───────────────── */
     .seat-btn {
-      width: 48px;
-      height: 32px;
-      border-radius: 6px;
+      min-width: 65px;
+      height: 42px;
+      border-radius: 8px;
       border: 2px solid #adb5bd;
       background: #e9ecef;
-      font-size: 0.62rem;
+      font-size: 0.75rem;
       font-weight: 700;
       cursor: pointer;
-      transition: all 0.15s ease;
-      padding: 0;
+      transition: all 0.2s ease;
+      padding: 0 8px;
       color: #495057;
-      line-height: 1;
+      white-space: nowrap;
     }
+    
     .seat-btn:hover:not(:disabled) {
       transform: scale(1.05);
       border-color: var(--tier-border, #6c5ce7);
       background: var(--tier-bg, #e9ecef);
       z-index: 1;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
+    
     .seat-btn.seat-booked {
       background: #dc3545 !important;
       border-color: #b02a37 !important;
       color: #fff !important;
       cursor: not-allowed;
-      opacity: 0.7;
+      opacity: 0.8;
     }
+    
     .seat-btn.seat-selected {
       background: #6c5ce7 !important;
       border-color: #4a3ab5 !important;
       color: #fff !important;
       transform: scale(1.03);
-      box-shadow: 0 0 0 2px rgba(108,92,231,0.3);
+      box-shadow: 0 0 0 3px rgba(108,92,231,0.3);
     }
+    
     .seat-btn:disabled {
       cursor: not-allowed;
       opacity: 0.6;
@@ -256,34 +269,35 @@ export interface SeatSelection {
     .selection-summary {
       background: #f0eeff;
       border: 1px solid #d0c6ff;
-      border-radius: 10px;
-      padding: 12px 16px;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-top: 20px;
     }
     .summary-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
     .chip {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       background: #6c5ce7;
       color: #fff;
-      border-radius: 20px;
-      padding: 3px 10px 3px 12px;
-      font-size: 0.78rem;
+      border-radius: 25px;
+      padding: 4px 12px 4px 14px;
+      font-size: 0.85rem;
       font-weight: 600;
     }
-    .chip-tier { opacity: 0.7; font-weight: 400; }
+    .chip-tier { opacity: 0.8; font-weight: 400; }
     .chip-remove {
       background: none;
       border: none;
       color: #fff;
       cursor: pointer;
       padding: 0 4px;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       opacity: 0.8;
       line-height: 1;
     }
@@ -293,37 +307,55 @@ export interface SeatSelection {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.88rem;
+      font-size: 0.95rem;
       color: #444;
       font-weight: 500;
+      padding-top: 10px;
+      border-top: 1px solid #d0c6ff;
     }
     .total-price {
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       font-weight: 800;
       color: #6c5ce7;
     }
     .no-selection {
       text-align: center;
-      padding: 12px;
+      padding: 16px;
       color: #adb5bd;
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       font-style: italic;
     }
     .max-warning {
       text-align: center;
-      padding: 10px;
-      margin-top: 10px;
+      padding: 12px;
+      margin-top: 12px;
       color: #e67e22;
       background: #fff3e0;
-      border-radius: 8px;
-      font-size: 0.75rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 500;
     }
 
     /* ── Responsive ──────────────────────────────────────────── */
-    @media (max-width: 480px) {
-      .seat-btn { width: 38px; height: 28px; font-size: 0.55rem; }
-      .seats-in-row { gap: 3px; }
-      .row-label { width: 28px; font-size: 0.65rem; }
+    @media (max-width: 992px) {
+      .seat-btn { min-width: 55px; height: 38px; font-size: 0.7rem; padding: 0 6px; }
+      .row-label { width: 38px; font-size: 0.8rem; }
+    }
+    
+    @media (max-width: 768px) {
+      .seat-btn { min-width: 48px; height: 36px; font-size: 0.65rem; }
+      .row-label { width: 32px; font-size: 0.75rem; }
+      .seat-section { padding: 12px; }
+      .section-header { padding: 8px 16px; font-size: 0.85rem; }
+    }
+    
+    @media (max-width: 576px) {
+      .seat-btn { min-width: 42px; height: 32px; font-size: 0.6rem; padding: 0 4px; }
+      .seats-in-row { gap: 5px; }
+      .row-label { width: 28px; font-size: 0.7rem; }
+      .seat-legend { gap: 10px; padding: 8px 12px; }
+      .legend-item { font-size: 0.7rem; }
+      .legend-dot { width: 12px; height: 12px; }
     }
   `]
 })
@@ -420,9 +452,8 @@ export class SeatMapComponent implements OnChanges {
     return this.selectedIds.has(id);
   }
 
-  // FIXED: Show full seat number (e.g., "P-A1" instead of just "A1")
   seatLabel(seatNumber: string): string {
-    // Return the full seat number for better clarity
+    // Show full seat number (e.g., "P-A1")
     return seatNumber;
   }
 

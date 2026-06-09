@@ -132,6 +132,8 @@ namespace EventBooking.API.DTOs
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
         public decimal TicketPrice { get; set; }
+        public decimal MinPrice { get; set; }      // NEW
+        public decimal MaxPrice { get; set; }
         public int TotalTickets { get; set; }
         public int BookedTickets { get; set; }
         public int AvailableTickets { get; set; }

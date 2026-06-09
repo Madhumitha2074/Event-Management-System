@@ -10,6 +10,10 @@ export class AuthService {
   private readonly API = `${environment.apiUrl}/auth`;
   private currentUserSubject = new BehaviorSubject<AuthResponse | null>(this.getStoredUser());
   currentUser$ = this.currentUserSubject.asObservable();
+  
+  // Location subject for storing selected city
+  private selectedCitySubject = new BehaviorSubject<string | null>(this.getStoredCity());
+  selectedCity$ = this.selectedCitySubject.asObservable();
 
   constructor(private http: HttpClient, private router: Router) {}
 
@@ -29,9 +33,13 @@ export class AuthService {
     return this.http.get<User>(`${this.API}/profile`);
   }
 
+  // UPDATED: Clear selected city on logout
   logout(): void {
     localStorage.removeItem('auth_user');
+    // Clear selected city on logout so popup shows again on next login
+    localStorage.removeItem('selected_city');
     this.currentUserSubject.next(null);
+    this.selectedCitySubject.next(null);
     this.router.navigate(['/auth/login']);
   }
 
@@ -50,6 +58,41 @@ export class AuthService {
   get token(): string | null {
     return this.currentUser?.token ?? null;
   }
+
+  // =====================================================
+  // City/Location Management Methods
+  // =====================================================
+  
+  // Set the selected city
+  setSelectedCity(city: string): void {
+    localStorage.setItem('selected_city', city);
+    this.selectedCitySubject.next(city);
+  }
+
+  // Get the selected city
+  getSelectedCity(): string | null {
+    return this.getStoredCity();
+  }
+
+  // Clear the selected city
+  clearSelectedCity(): void {
+    localStorage.removeItem('selected_city');
+    this.selectedCitySubject.next(null);
+  }
+
+  // Check if user has selected a city
+  hasSelectedCity(): boolean {
+    return this.getStoredCity() !== null;
+  }
+
+  // Get stored city from localStorage
+  private getStoredCity(): string | null {
+    return localStorage.getItem('selected_city');
+  }
+
+  // =====================================================
+  // Private Helper Methods
+  // =====================================================
 
   private storeUser(res: AuthResponse): void {
     localStorage.setItem('auth_user', JSON.stringify(res));

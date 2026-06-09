@@ -1,7 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { EventService } from '../../../core/services/event.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Event, EventFilter, PagedResult, EVENT_CATEGORIES } from '../../../core/models/models';
 import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 
 @Component({
   selector: 'app-event-list',
@@ -40,8 +42,17 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
               <i class="fas fa-filter me-2"></i>Filters
             </h5>
 
+            <!-- City filter with clear button -->
             <div class="mb-3">
-              <label class="form-label small fw-semibold">City</label>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label small fw-semibold mb-0">City</label>
+                <button 
+                  *ngIf="filter.city" 
+                  class="btn btn-link btn-sm p-0 text-muted" 
+                  (click)="clearCityFilter()">
+                  <i class="fas fa-times"></i> Clear
+                </button>
+              </div>
               <input
                 class="form-control form-control-sm"
                 placeholder="Any city"
@@ -101,7 +112,7 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
               </div>
             </div>
 
-            <!-- ✅ Apply + Clear buttons -->
+            <!-- Apply + Clear buttons -->
             <div class="d-grid gap-2">
               <button
                 class="btn btn-primary btn-sm"
@@ -125,6 +136,11 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
             <span class="text-muted">
               {{ result?.totalCount || 0 }} events found
             </span>
+            <div *ngIf="filter.city" class="badge bg-primary">
+              <i class="fas fa-map-marker-alt me-1"></i>
+              {{ filter.city }}
+              <button class="btn-close-white ms-2" style="font-size: 0.6rem;" (click)="clearCityFilter()">✕</button>
+            </div>
           </div>
 
           <div *ngIf="loading" class="text-center py-5">
@@ -135,6 +151,9 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
             <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
             <h5 class="text-muted">No events found</h5>
             <p class="text-muted">Try adjusting your filters</p>
+            <button *ngIf="filter.city" class="btn btn-outline-primary mt-2" (click)="clearCityFilter()">
+              <i class="fas fa-globe me-1"></i>View all cities
+            </button>
           </div>
 
           <div class="row g-4" *ngIf="!loading && events.length > 0">
@@ -147,25 +166,46 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
                   alt="{{ event.title }}"
                 />
                 <div class="card-body d-flex flex-column">
+                  
+                  <!-- Price and Category - Updated with safe navigation -->
                   <div class="d-flex justify-content-between align-items-start mb-2">
                     <span class="badge-category">{{ event.category }}</span>
-                    <span class="price">
-                      {{ event.ticketPrice === 0
-                          ? 'Free'
-                          : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
-                    </span>
+                    <div class="price text-end">
+                      <!-- Check if event has seat map with different prices -->
+                      <ng-container *ngIf="event.hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
+                        <div class="fw-bold text-primary">From ₹{{ event.minPrice }}</div>
+                        <small class="text-muted">/seat</small>
+                      </ng-container>
+                      <!-- For events without seat map or same prices -->
+                      <ng-container *ngIf="!event.hasSeatMap || !event.minPrice || event.minPrice === event.maxPrice">
+                        <div class="fw-bold text-primary">
+                          {{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
+                        </div>
+                        <small class="text-muted">/ticket</small>
+                      </ng-container>
+                    </div>
                   </div>
+                  
+                  <!-- Title -->
                   <h6 class="fw-bold mb-1">{{ event.title }}</h6>
+                  
+                  <!-- Location -->
                   <p class="text-muted small mb-1">
                     <i class="fas fa-map-marker-alt me-1"></i>{{ event.city }}
                   </p>
+                  
+                  <!-- Date -->
                   <p class="text-muted small mb-2">
                     <i class="fas fa-calendar me-1"></i>
                     {{ event.startDateTime | date:'MMM d, y, h:mm a' }}
                   </p>
+                  
+                  <!-- Description -->
                   <p class="text-muted small flex-grow-1">
                     {{ event.description | slice:0:80 }}...
                   </p>
+                  
+                  <!-- Footer with availability and button -->
                   <div class="d-flex justify-content-between align-items-center mt-auto">
                     <small class="text-muted">
                       <i class="fas fa-ticket-alt me-1"></i>
@@ -176,6 +216,7 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
                       View <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                   </div>
+                  
                 </div>
               </div>
             </div>
@@ -210,29 +251,111 @@ import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
         </div>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    .page-hero {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      padding: 60px 0;
+      margin-bottom: 40px;
+      border-radius: 0 0 30px 30px;
+    }
+    .filter-sidebar {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    .event-card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+    .event-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .event-card .card-img-top {
+      height: 200px;
+      object-fit: cover;
+    }
+    .badge-category {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .price {
+      .fw-bold {
+        font-size: 1rem;
+        line-height: 1.2;
+      }
+      small {
+        font-size: 0.6rem;
+      }
+    }
+    .btn-primary {
+      background-color: #6c5ce7;
+      border-color: #6c5ce7;
+    }
+    .btn-primary:hover {
+      background-color: #5a4ad1;
+      border-color: #5a4ad1;
+    }
+    .btn-close-white {
+      background: none;
+      border: none;
+      color: white;
+      opacity: 0.7;
+      cursor: pointer;
+    }
+    .btn-close-white:hover {
+      opacity: 1;
+    }
+  `]
 })
 export class EventListComponent implements OnInit {
 
-  events: Event[]              = [];
+  events: Event[] = [];
   result: PagedResult<Event> | null = null;
-  loading                      = false;
-  categories                   = EVENT_CATEGORIES;
+  loading = false;
+  categories = EVENT_CATEGORIES;
 
-  // ✅ Two separate filter objects:
-  // filter       = what was last sent to the API (committed)
+  // Two separate filter objects:
+  // filter = what was last sent to the API (committed)
   // pendingFilter = what the user is currently typing (not yet applied)
-  filter:        EventFilter = { page: 1, pageSize: 9 };
+  filter: EventFilter = { page: 1, pageSize: 9 };
   pendingFilter: EventFilter = { page: 1, pageSize: 9 };
 
   private searchSubject = new Subject<string>();
 
-  constructor(private eventService: EventService) {}
+  constructor(
+    private eventService: EventService,
+    private authService: AuthService,
+    private toastr: ToastrService
+  ) {}
 
   ngOnInit(): void {
+    // Check if there's a selected city from location popup
+    this.authService.selectedCity$.subscribe(city => {
+      if (city && !this.filter.city) {
+        this.filter.city = city;
+        this.pendingFilter.city = city;
+        this.loadEvents();
+        this.toastr.info(`Showing events in ${city}`, 'Local Events', {
+          timeOut: 3000,
+          positionClass: 'toast-top-right'
+        });
+      }
+    });
+    
     this.loadEvents();
 
-    // Search bar still uses debounce for live search
+    // Search bar uses debounce for live search
     this.searchSubject
       .pipe(debounceTime(400), distinctUntilChanged())
       .subscribe(() => {
@@ -241,45 +364,58 @@ export class EventListComponent implements OnInit {
       });
   }
 
-  // ✅ Apply button — copy pendingFilter into filter and reload
+  // Apply button — copy pendingFilter into filter and reload
   applyFilters(): void {
-  // ✅ Build filter explicitly — don't rely on spread for falsy values like 0
-  const categoryValue = this.pendingFilter.category;
+    const categoryValue = this.pendingFilter.category;
 
-  this.filter = {
-    search:    this.filter.search,
-    city:      this.pendingFilter.city       || undefined,
-    // ✅ Explicitly check for undefined/null — 0 is a valid category (Music)
-    category:  (categoryValue !== undefined && categoryValue !== null)
+    this.filter = {
+      search: this.filter.search,
+      city: this.pendingFilter.city || undefined,
+      category: (categoryValue !== undefined && categoryValue !== null)
                  ? Number(categoryValue)
                  : undefined,
-    startDate: this.pendingFilter.startDate  || undefined,
-    endDate:   this.pendingFilter.endDate    || undefined,
-    minPrice:  this.pendingFilter.minPrice   || undefined,
-    maxPrice:  this.pendingFilter.maxPrice   || undefined,
-    page:      1,
-    pageSize:  9
-  };
+      startDate: this.pendingFilter.startDate || undefined,
+      endDate: this.pendingFilter.endDate || undefined,
+      minPrice: this.pendingFilter.minPrice || undefined,
+      maxPrice: this.pendingFilter.maxPrice || undefined,
+      page: 1,
+      pageSize: 9
+    };
 
-  this.loadEvents();
-}
+    this.loadEvents();
+    
+    if (this.filter.city) {
+      this.toastr.info(`Showing events in ${this.filter.city}`);
+    }
+  }
 
-  // ✅ Clear button — reset both filters completely
+  // Clear button — reset both filters completely
   resetFilters(): void {
-  this.filter        = { page: 1, pageSize: 9 };
-  this.pendingFilter = { page: 1, pageSize: 9 };
-  this.loadEvents();
-}
+    this.filter = { page: 1, pageSize: 9 };
+    this.pendingFilter = { page: 1, pageSize: 9 };
+    this.loadEvents();
+    this.toastr.info('All filters cleared');
+  }
+  
+  // Clear only the city filter
+  clearCityFilter(): void {
+    this.filter.city = undefined;
+    this.pendingFilter.city = undefined;
+    this.loadEvents();
+    this.toastr.info('Showing events from all cities');
+  }
 
   loadEvents(): void {
     this.loading = true;
     this.eventService.getEvents(this.filter).subscribe({
       next: (res) => {
-        this.result  = res;
-        this.events  = res.items;
+        this.result = res;
+        this.events = res.items;
         this.loading = false;
       },
-      error: () => { this.loading = false; }
+      error: () => { 
+        this.loading = false; 
+      }
     });
   }
 

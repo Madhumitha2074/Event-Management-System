@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
 import { AuthResponse } from '../../core/models/models';
+import { LocationPopupService } from '../../core/services/location-popup.service';
 
 @Component({
   selector: 'app-navbar',
@@ -30,10 +31,12 @@ import { AuthResponse } from '../../core/models/models';
               </a>
             </li>
 
-            <li class="nav-item" *ngIf="isLoggedIn">
+            <!-- Only show My Bookings for regular Users (not Organizer or Admin) -->
+            <li class="nav-item" *ngIf="isLoggedIn && isRegularUser">
               <a class="nav-link" routerLink="/bookings">My Bookings</a>
             </li>
 
+            <!-- Show Dashboard for Organizer and Admin -->
             <li class="nav-item" *ngIf="isOrganizer">
               <a class="nav-link" routerLink="/organizer">Dashboard</a>
             </li>
@@ -55,6 +58,15 @@ import { AuthResponse } from '../../core/models/models';
 
             <!-- Logged in -->
             <ng-container *ngIf="isLoggedIn">
+              <!-- City Selector Button -->
+              <li class="nav-item me-2">
+                <button class="btn btn-outline-light btn-sm" (click)="changeCity()">
+                  <i class="fas fa-map-marker-alt me-1"></i>
+                  {{ selectedCity || 'Select City' }}
+                  <i class="fas fa-chevron-down ms-1"></i>
+                </button>
+              </li>
+
               <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle"
                    href="#"
@@ -68,15 +80,31 @@ import { AuthResponse } from '../../core/models/models';
                 <ul class="dropdown-menu dropdown-menu-end">
 
                   <li>
-                    <!-- ✅ Fixed: /auth/profile not /profile -->
                     <a class="dropdown-item" routerLink="/auth/profile">
                       <i class="fas fa-user me-2"></i>My Profile
                     </a>
                   </li>
 
-                  <li>
+                  <!-- Only show My Bookings in dropdown for regular Users -->
+                  <li *ngIf="isRegularUser">
                     <a class="dropdown-item" routerLink="/bookings">
                       <i class="fas fa-ticket-alt me-2"></i>My Bookings
+                    </a>
+                  </li>
+
+                  <!-- Show Dashboard in dropdown for Organizer/Admin -->
+                  <li *ngIf="isOrganizer">
+                    <a class="dropdown-item" routerLink="/organizer">
+                      <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                    </a>
+                  </li>
+
+                  <li><hr class="dropdown-divider"></li>
+
+                  <!-- Change City option in dropdown -->
+                  <li>
+                    <a class="dropdown-item" (click)="changeCity()">
+                      <i class="fas fa-map-marker-alt me-2"></i>Change City
                     </a>
                   </li>
 
@@ -100,17 +128,36 @@ import { AuthResponse } from '../../core/models/models';
 })
 export class NavbarComponent implements OnInit {
   currentUser: AuthResponse | null = null;
-  isLoggedIn  = false;
+  isLoggedIn = false;
   isOrganizer = false;
+  isRegularUser = false;
+  selectedCity: string | null = null;
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private locationPopupService: LocationPopupService
+  ) {}
 
   ngOnInit(): void {
     this.authService.currentUser$.subscribe(user => {
       this.currentUser = user;
-      this.isLoggedIn  = !!user;
+      this.isLoggedIn = !!user;
       this.isOrganizer = user?.role === 'Organizer' || user?.role === 'Admin';
+      this.isRegularUser = user?.role === 'User';
     });
+
+    // Subscribe to selected city changes
+    this.authService.selectedCity$.subscribe(city => {
+      this.selectedCity = city;
+    });
+  }
+
+  // Method to change city
+  changeCity(): void {
+    // Clear selected city
+    this.authService.clearSelectedCity();
+    // Show location popup
+    this.locationPopupService.show();
   }
 
   logout(): void {

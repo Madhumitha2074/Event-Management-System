@@ -42,6 +42,8 @@ export interface Event {
   address?: string;
   imageUrl?: string;
   ticketPrice: number;
+  minPrice?: number;      // NEW
+  maxPrice?: number; 
   totalTickets: number;
   bookedTickets: number;
   availableTickets: number;
@@ -49,6 +51,7 @@ export interface Event {
   organizerId: number;
   createdAt: string;
   seatConfig?: string; 
+  hasSeatMap?: boolean;
 }
 
 export interface EventFilter {

@@ -495,11 +495,52 @@ namespace EventBooking.API.Services
         {
             string categoryString = reader["Category"].ToString()!;
 
-            // ✅ Convert category string back to index for Angular form dropdown
+            // Convert category string back to index for Angular form dropdown
             int categoryIndex = Array.IndexOf(CategoryNames, categoryString);
             if (categoryIndex < 0) categoryIndex = 7;
 
             string? seatConfig = reader["SeatConfig"] == DBNull.Value ? null : reader["SeatConfig"].ToString();
+            
+            // Calculate min and max prices from seat configuration
+            decimal ticketPrice = Convert.ToDecimal(reader["TicketPrice"]);
+            decimal minPrice = ticketPrice;
+            decimal maxPrice = ticketPrice;
+            
+            // If seat config exists, parse it to get actual price range
+            if (!string.IsNullOrEmpty(seatConfig))
+            {
+                try
+                {
+                    // Try to deserialize as array directly
+                    var tiers = JsonSerializer.Deserialize<List<SeatTierConfigDto>>(seatConfig);
+                    if (tiers != null && tiers.Any())
+                    {
+                        minPrice = tiers.Min(t => t.Price);
+                        maxPrice = tiers.Max(t => t.Price);
+                    }
+                }
+                catch
+                {
+                    // If that fails, try with wrapper object { "seatTiers": [...] }
+                    try
+                    {
+                        using JsonDocument doc = JsonDocument.Parse(seatConfig);
+                        if (doc.RootElement.TryGetProperty("seatTiers", out JsonElement seatTiersElement))
+                        {
+                            var tiers = JsonSerializer.Deserialize<List<SeatTierConfigDto>>(seatTiersElement.GetRawText());
+                            if (tiers != null && tiers.Any())
+                            {
+                                minPrice = tiers.Min(t => t.Price);
+                                maxPrice = tiers.Max(t => t.Price);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error parsing seat config: {ex.Message}");
+                    }
+                }
+            }
 
             return new EventDto
             {
@@ -515,7 +556,9 @@ namespace EventBooking.API.Services
                 City = reader["City"].ToString()!,
                 Address = reader["Address"] == DBNull.Value ? null : reader["Address"].ToString(),
                 ImageUrl = reader["ImageUrl"] == DBNull.Value ? null : reader["ImageUrl"].ToString(),
-                TicketPrice = Convert.ToDecimal(reader["TicketPrice"]),
+                TicketPrice = ticketPrice,
+                MinPrice = minPrice,
+                MaxPrice = maxPrice,
                 TotalTickets = Convert.ToInt32(reader["TotalTickets"]),
                 BookedTickets = Convert.ToInt32(reader["BookedTickets"]),
                 AvailableTickets = Convert.ToInt32(reader["AvailableTickets"]),

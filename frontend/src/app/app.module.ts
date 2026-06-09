@@ -9,14 +9,21 @@ import { AppComponent } from './app.component';
 import { NavbarComponent } from './shared/navbar/navbar.component';
 import { FooterComponent } from './shared/footer/footer.component';
 import { AuthInterceptor } from './core/interceptors/auth.interceptor';
+import { LocationSelectorComponent } from './shared/location-selector/location-selector.component';
 
 @NgModule({
-  declarations: [AppComponent, NavbarComponent, FooterComponent],
+  declarations: [
+    AppComponent, 
+    NavbarComponent, 
+    FooterComponent
+    // Note: LocationSelectorComponent is NOT in declarations because it's standalone
+  ],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
     HttpClientModule,
     AppRoutingModule,
+    LocationSelectorComponent, // ✅ Standalone component goes in imports
     ToastrModule.forRoot({ positionClass: 'toast-top-right', timeOut: 3000 })
   ],
   providers: [
@@ -24,4 +31,4 @@ import { AuthInterceptor } from './core/interceptors/auth.interceptor';
   ],
   bootstrap: [AppComponent]
 })
-export class AppModule {}
+export class AppModule { }

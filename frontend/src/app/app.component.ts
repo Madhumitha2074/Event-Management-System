@@ -1,4 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { AuthService } from './core/services/auth.service';
+import { LocationPopupService } from './core/services/location-popup.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-root',
@@ -8,6 +11,54 @@ import { Component } from '@angular/core';
       <router-outlet></router-outlet>
     </main>
     <app-footer></app-footer>
+    
+    <!-- Location Selector Popup -->
+    <app-location-selector 
+      *ngIf="showLocationPopup"
+      (citySelected)="onCitySelected($event)"
+      (closed)="onLocationPopupClosed()">
+    </app-location-selector>
   `
 })
-export class AppComponent {}
+export class AppComponent implements OnInit {
+  showLocationPopup = false;
+
+  constructor(
+    private authService: AuthService,
+    private locationPopupService: LocationPopupService,
+    private router: Router
+  ) {}
+
+  ngOnInit(): void {
+    // Subscribe to popup visibility from service
+    this.locationPopupService.showPopup$.subscribe(show => {
+      this.showLocationPopup = show;
+    });
+
+    // Check when user logs in
+    this.authService.currentUser$.subscribe(user => {
+      if (user) {
+        const selectedCity = this.authService.getSelectedCity();
+        if (!selectedCity) {
+          setTimeout(() => {
+            this.locationPopupService.show();
+          }, 500);
+        }
+      }
+    });
+  }
+
+  onCitySelected(city: string): void {
+    this.authService.setSelectedCity(city);
+    this.locationPopupService.hide();
+    
+    // Navigate to events page with city filter
+    this.router.navigate(['/events'], { 
+      queryParams: { city: city } 
+    });
+  }
+
+  onLocationPopupClosed(): void {
+    this.locationPopupService.hide();
+  }
+}

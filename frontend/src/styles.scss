@@ -166,3 +166,22 @@ body {
   transform: translateY(-4px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
 }
+
+.price {
+  .fw-bold {
+    font-size: 1.1rem;
+    line-height: 1.2;
+  }
+  small {
+    font-size: 0.65rem;
+  }
+}
+
+.badge-category {
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
