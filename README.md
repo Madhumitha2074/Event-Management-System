@@ -1,33 +1,83 @@
 # Local Event Booking Platform
 
-A full-stack platform for discovering and booking local events, built with **ASP.NET Core 8**, **Angular 17**, and **MySQL**.
+A full-stack platform for discovering and booking local events, built with **ASP.NET Core 8**, **Angular 17**, and **SQL Server**.
 
 ---
 
 ## Project Structure
 
 ```
-Madhu-Project/
-├── backend/
-│   └── EventBooking.API/        # ASP.NET Core Web API
-│       ├── Controllers/         # AuthController, EventsController, BookingsController
-│       ├── Data/                
-│       ├── DTOs/                # Data Transfer Objects
-│       ├── Models/              # Domain entities (User, Event, Booking, Ticket)
-│       ├── Services/            # AuthService, EventService, BookingService, EmailService
-│       ├── Program.cs           # App entry point & DI configuration
-│       └── appsettings.json     # Configuration (DB, JWT, SMTP)
-├── frontend/
-│   └── src/app/
-│       ├── core/                # Models, Services, Guards, Interceptors
-│       ├── features/
-│       │   ├── auth/            # Login, Register
-│       │   ├── events/          # Event List, Event Detail + Booking Form
-│       │   ├── bookings/        # Booking History, Booking Detail
-│       │   └── organizer/       # Dashboard, Event Form, Attendees
-│       └── shared/              # Navbar, Footer
-└── database/
-    └── schema.sql               # MySQL schema + sample data
+backend/EventBooking.API/
+├── Controllers/
+│   ├── AuthController.cs
+│   ├── BookingsController.cs
+│   ├── EventsController.cs
+│   └── SeatsController.cs
+├── Services/
+│   ├── AuthService.cs
+│   ├── BookingService.cs
+│   ├── EmailService.cs
+│   ├── EventService.cs
+│   ├── PdfService.cs
+│   ├── QrCodeService.cs
+│   └── SeatService.cs
+├── DTOs/
+│   └── AppDtos.cs
+├── Models/
+│   ├── User.cs
+│   ├── Event.cs
+│   ├── Booking.cs
+│   ├── Ticket.cs
+│   └── EventSeat.cs
+├── Data/
+│   └── DatabaseHelper.cs
+└── Program.cs
+
+frontend/src/app/
+├── core/
+│   ├── guards/
+│   │   └── auth.guard.ts
+│   ├── interceptors/
+│   │   └── auth.interceptor.ts
+│   └── services/
+│       ├── auth.service.ts
+│       ├── booking.service.ts
+│       ├── event.service.ts
+│       └── location-popup.service.ts
+├── features/
+│   ├── auth/
+│   │   ├── login/
+│   │   ├── register/
+│   │   └── profile/
+│   ├── bookings/
+│   │   ├── booking-list/
+│   │   └── booking-detail/
+│   ├── events/
+│   │   ├── event-list/
+│   │   ├── event-detail/
+│   │   └── seat-map/
+│   └── organizer/
+│       ├── organizer-dashboard/
+│       ├── event-form/
+│       ├── attendees/
+│       └── scanner/
+├── shared/
+│   ├── navbar/
+│   ├── footer/
+│   └── location-selector/
+└── app.module.ts
+
+Users (Id, Name, Email, PasswordHash, Role)
+    │
+    ├──< Events (OrganizerId → Users.Id)
+    │       │
+    │       └──< EventSeats (EventId → Events.Id)
+    │
+    └──< Bookings (UserId → Users.Id)
+            │
+            └──< Tickets (BookingId → Bookings.Id)
+                    │
+                    └─── EventSeats (TicketId → Tickets.Id)
 ```
 
 ---
@@ -39,7 +89,7 @@ Madhu-Project/
 | .NET SDK | 8.0+ |
 | Node.js | 18+ |
 | Angular CLI | 17+ |
-| MySQL | 8.0+ |
+| SQL server | 8.0+ |
 
 ---
 
