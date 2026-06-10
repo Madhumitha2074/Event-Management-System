@@ -39,13 +39,15 @@ import { ToastrService } from 'ngx-toastr';
         <div class="col-lg-3 mb-4">
           <div class="filter-sidebar">
             <h5 class="fw-bold mb-3">
-              <i class="fas fa-filter me-2"></i>Filters
+              <i class="fas fa-sliders-h me-2 text-primary"></i>Filters
             </h5>
 
             <!-- City filter with clear button -->
             <div class="mb-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
-                <label class="form-label small fw-semibold mb-0">City</label>
+                <label class="form-label small fw-semibold mb-0">
+                  <i class="fas fa-city me-1 text-muted"></i>City
+                </label>
                 <button 
                   *ngIf="filter.city" 
                   class="btn btn-link btn-sm p-0 text-muted" 
@@ -61,7 +63,9 @@ import { ToastrService } from 'ngx-toastr';
             </div>
 
             <div class="mb-3">
-              <label class="form-label small fw-semibold">Category</label>
+              <label class="form-label small fw-semibold mb-1">
+                <i class="fas fa-tag me-1 text-muted"></i>Category
+              </label>
               <select
                 class="form-select form-select-sm"
                 [(ngModel)]="pendingFilter.category"
@@ -74,7 +78,9 @@ import { ToastrService } from 'ngx-toastr';
             </div>
 
             <div class="mb-3">
-              <label class="form-label small fw-semibold">Date From</label>
+              <label class="form-label small fw-semibold mb-1">
+                <i class="fas fa-calendar me-1 text-muted"></i>Date From
+              </label>
               <input
                 type="date"
                 class="form-control form-control-sm"
@@ -83,7 +89,9 @@ import { ToastrService } from 'ngx-toastr';
             </div>
 
             <div class="mb-3">
-              <label class="form-label small fw-semibold">Date To</label>
+              <label class="form-label small fw-semibold mb-1">
+                <i class="fas fa-calendar-alt me-1 text-muted"></i>Date To
+              </label>
               <input
                 type="date"
                 class="form-control form-control-sm"
@@ -93,7 +101,9 @@ import { ToastrService } from 'ngx-toastr';
 
             <div class="row g-2 mb-3">
               <div class="col-6">
-                <label class="form-label small fw-semibold">Min Price</label>
+                <label class="form-label small fw-semibold mb-1">
+                  <i class="fas fa-rupee-sign me-1 text-muted"></i>Min Price
+                </label>
                 <input
                   type="number"
                   class="form-control form-control-sm"
@@ -102,7 +112,9 @@ import { ToastrService } from 'ngx-toastr';
                 />
               </div>
               <div class="col-6">
-                <label class="form-label small fw-semibold">Max Price</label>
+                <label class="form-label small fw-semibold mb-1">
+                  <i class="fas fa-rupee-sign me-1 text-muted"></i>Max Price
+                </label>
                 <input
                   type="number"
                   class="form-control form-control-sm"
@@ -122,7 +134,7 @@ import { ToastrService } from 'ngx-toastr';
               <button
                 class="btn btn-outline-secondary btn-sm"
                 (click)="resetFilters()">
-                <i class="fas fa-times me-1"></i>Clear Filters
+                <i class="fas fa-redo-alt me-1"></i>Reset Filters
               </button>
             </div>
 
@@ -134,7 +146,7 @@ import { ToastrService } from 'ngx-toastr';
 
           <div class="d-flex justify-content-between align-items-center mb-3">
             <span class="text-muted">
-              {{ result?.totalCount || 0 }} events found
+              <i class="fas fa-list me-1"></i>{{ result?.totalCount || 0 }} events found
             </span>
             <div *ngIf="filter.city" class="badge bg-primary">
               <i class="fas fa-map-marker-alt me-1"></i>
@@ -159,61 +171,63 @@ import { ToastrService } from 'ngx-toastr';
           <div class="row g-4" *ngIf="!loading && events.length > 0">
             <div class="col-md-4" *ngFor="let event of events">
               <div class="card event-card h-100">
-                <img
-                  [src]="event.imageUrl || 'https://placehold.co/400x200?text=No+Image'"
-                  (error)="onImageError($event)"
-                  class="card-img-top"
-                  alt="{{ event.title }}"
-                />
+                <div class="card-img-wrapper">
+                  <img
+                    [src]="event.imageUrl || 'https://placehold.co/400x200?text=No+Image'"
+                    (error)="onImageError($event)"
+                    class="card-img-top"
+                    alt="{{ event.title }}"
+                  />
+                  <span class="category-badge">{{ event.category }}</span>
+                </div>
                 <div class="card-body d-flex flex-column">
                   
-                  <!-- Price and Category - Updated with safe navigation -->
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge-category">{{ event.category }}</span>
-                    <div class="price text-end">
-                      <!-- Check if event has seat map with different prices -->
-                      <ng-container *ngIf="event.hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
-                        <div class="fw-bold text-primary">From ₹{{ event.minPrice }}</div>
-                        <small class="text-muted">/seat</small>
-                      </ng-container>
-                      <!-- For events without seat map or same prices -->
-                      <ng-container *ngIf="!event.hasSeatMap || !event.minPrice || event.minPrice === event.maxPrice">
-                        <div class="fw-bold text-primary">
-                          {{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
-                        </div>
-                        <small class="text-muted">/ticket</small>
-                      </ng-container>
-                    </div>
+                  <!-- Price -->
+                  <div class="price-tag">
+                    <ng-container *ngIf="event.hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
+                      <span class="price-amount">From ₹{{ event.minPrice }}</span>
+                      <span class="price-unit">/seat</span>
+                    </ng-container>
+                    <ng-container *ngIf="!event.hasSeatMap || !event.minPrice || event.minPrice === event.maxPrice">
+                      <span class="price-amount">{{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}</span>
+                      <span class="price-unit">/ticket</span>
+                    </ng-container>
                   </div>
                   
                   <!-- Title -->
-                  <h6 class="fw-bold mb-1">{{ event.title }}</h6>
+                  <h6 class="event-title">{{ event.title }}</h6>
                   
-                  <!-- Location -->
-                  <p class="text-muted small mb-1">
-                    <i class="fas fa-map-marker-alt me-1"></i>{{ event.city }}
+                  <!-- Location with Google Maps Link -->
+                  <p class="event-location">
+                    <a [href]="event.googleMapsUrl || getGoogleMapsUrl(event)" 
+                       target="_blank" 
+                       class="text-decoration-none"
+                       title="Open in Google Maps">
+                      <i class="fas fa-map-marker-alt me-1"></i>
+                      {{ event.venue }}, {{ event.city }}
+                    </a>
                   </p>
                   
                   <!-- Date -->
-                  <p class="text-muted small mb-2">
+                  <p class="event-date">
                     <i class="fas fa-calendar me-1"></i>
                     {{ event.startDateTime | date:'MMM d, y, h:mm a' }}
                   </p>
                   
                   <!-- Description -->
-                  <p class="text-muted small flex-grow-1">
+                  <p class="event-description">
                     {{ event.description | slice:0:80 }}...
                   </p>
                   
-                  <!-- Footer with availability and button -->
-                  <div class="d-flex justify-content-between align-items-center mt-auto">
-                    <small class="text-muted">
+                  <!-- Footer -->
+                  <div class="event-footer">
+                    <div class="tickets-left">
                       <i class="fas fa-ticket-alt me-1"></i>
                       {{ event.availableTickets }} left
-                    </small>
+                    </div>
                     <a [routerLink]="['/events', event.id]"
-                       class="btn btn-primary btn-sm px-3">
-                      View <i class="fas fa-arrow-right ms-1"></i>
+                       class="btn-view">
+                      View Details <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                   </div>
                   
@@ -228,7 +242,7 @@ import { ToastrService } from 'ngx-toastr';
               <li class="page-item" [class.disabled]="filter.page === 1">
                 <button class="page-link"
                   (click)="changePage((filter.page || 1) - 1)">
-                  Previous
+                  <i class="fas fa-chevron-left"></i> Previous
                 </button>
               </li>
               <li
@@ -242,7 +256,7 @@ import { ToastrService } from 'ngx-toastr';
                   [class.disabled]="filter.page === result.totalPages">
                 <button class="page-link"
                   (click)="changePage((filter.page || 1) + 1)">
-                  Next
+                  Next <i class="fas fa-chevron-right"></i>
                 </button>
               </li>
             </ul>
@@ -254,67 +268,187 @@ import { ToastrService } from 'ngx-toastr';
   `,
   styles: [`
     .page-hero {
-      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 60px 0;
+      padding: 80px 0;
       margin-bottom: 40px;
-      border-radius: 0 0 30px 30px;
+      border-radius: 0 0 40px 40px;
+    }
+    .page-hero h1 {
+      font-size: 3rem;
+    }
+    .page-hero .lead {
+      font-size: 1.2rem;
+      opacity: 0.9;
     }
     .filter-sidebar {
       background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      position: sticky;
+      top: 20px;
     }
     .event-card {
       border: none;
-      border-radius: 12px;
-      box-shadow: 0 2px 15px rgba(0,0,0,0.08);
-      transition: transform 0.2s, box-shadow 0.2s;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
       overflow: hidden;
+      background: white;
     }
     .event-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+      transform: translateY(-5px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.15);
     }
-    .event-card .card-img-top {
+    .card-img-wrapper {
+      position: relative;
+      overflow: hidden;
       height: 200px;
-      object-fit: cover;
     }
-    .badge-category {
-      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    .card-img-top {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    .event-card:hover .card-img-top {
+      transform: scale(1.05);
+    }
+    .category-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
       border-radius: 20px;
       padding: 4px 12px;
       font-size: 0.7rem;
       font-weight: 600;
+      letter-spacing: 0.5px;
     }
-    .price {
-      .fw-bold {
-        font-size: 1rem;
-        line-height: 1.2;
-      }
-      small {
-        font-size: 0.6rem;
-      }
+    .card-body {
+      padding: 20px;
+    }
+    .price-tag {
+      margin-bottom: 12px;
+    }
+    .price-amount {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #667eea;
+    }
+    .price-unit {
+      font-size: 0.7rem;
+      color: #a0aec0;
+      margin-left: 2px;
+    }
+    .event-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #2d3748;
+      line-height: 1.4;
+    }
+    .event-location {
+      font-size: 0.75rem;
+      color: #718096;
+      margin-bottom: 8px;
+    }
+    .event-location a {
+      color: #718096;
+      transition: color 0.2s;
+    }
+    .event-location a:hover {
+      color: #667eea;
+    }
+    .event-date {
+      font-size: 0.7rem;
+      color: #a0aec0;
+      margin-bottom: 12px;
+    }
+    .event-description {
+      font-size: 0.75rem;
+      color: #718096;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      flex-grow: 1;
+    }
+    .event-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .tickets-left {
+      font-size: 0.7rem;
+      color: #48bb78;
+      font-weight: 600;
+    }
+    .btn-view {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 25px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+    }
+    .btn-view:hover {
+      transform: translateX(3px);
+      color: white;
+      background: linear-gradient(135deg, #5a67d8, #6b46c1);
     }
     .btn-primary {
-      background-color: #6c5ce7;
-      border-color: #6c5ce7;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border: none;
     }
     .btn-primary:hover {
-      background-color: #5a4ad1;
-      border-color: #5a4ad1;
+      background: linear-gradient(135deg, #5a67d8, #6b46c1);
+      transform: translateY(-1px);
     }
-    .btn-close-white {
-      background: none;
-      border: none;
-      color: white;
-      opacity: 0.7;
-      cursor: pointer;
+    .btn-outline-secondary:hover {
+      background: #e2e8f0;
+      transform: translateY(-1px);
     }
-    .btn-close-white:hover {
-      opacity: 1;
+    .badge.bg-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2) !important;
+      padding: 6px 12px;
+      border-radius: 30px;
+    }
+    .pagination .page-item.active .page-link {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-color: #667eea;
+    }
+    .pagination .page-link {
+      color: #667eea;
+      border-radius: 8px;
+      margin: 0 3px;
+    }
+    .pagination .page-link:hover {
+      background: #f0f0f0;
+      color: #5a67d8;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 0.2rem rgba(102,126,234,0.25);
+    }
+    @media (max-width: 768px) {
+      .page-hero {
+        padding: 50px 0;
+      }
+      .page-hero h1 {
+        font-size: 2rem;
+      }
+      .filter-sidebar {
+        position: relative;
+        top: 0;
+      }
     }
   `]
 })
@@ -325,9 +459,6 @@ export class EventListComponent implements OnInit {
   loading = false;
   categories = EVENT_CATEGORIES;
 
-  // Two separate filter objects:
-  // filter = what was last sent to the API (committed)
-  // pendingFilter = what the user is currently typing (not yet applied)
   filter: EventFilter = { page: 1, pageSize: 9 };
   pendingFilter: EventFilter = { page: 1, pageSize: 9 };
 
@@ -340,7 +471,6 @@ export class EventListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Check if there's a selected city from location popup
     this.authService.selectedCity$.subscribe(city => {
       if (city && !this.filter.city) {
         this.filter.city = city;
@@ -355,7 +485,6 @@ export class EventListComponent implements OnInit {
     
     this.loadEvents();
 
-    // Search bar uses debounce for live search
     this.searchSubject
       .pipe(debounceTime(400), distinctUntilChanged())
       .subscribe(() => {
@@ -364,7 +493,14 @@ export class EventListComponent implements OnInit {
       });
   }
 
-  // Apply button — copy pendingFilter into filter and reload
+  getGoogleMapsUrl(event: any): string {
+    if (event.googleMapsUrl) {
+      return event.googleMapsUrl;
+    }
+    const query = encodeURIComponent(`${event.venue}, ${event.city}`);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+  }
+
   applyFilters(): void {
     const categoryValue = this.pendingFilter.category;
 
@@ -389,7 +525,6 @@ export class EventListComponent implements OnInit {
     }
   }
 
-  // Clear button — reset both filters completely
   resetFilters(): void {
     this.filter = { page: 1, pageSize: 9 };
     this.pendingFilter = { page: 1, pageSize: 9 };
@@ -397,7 +532,6 @@ export class EventListComponent implements OnInit {
     this.toastr.info('All filters cleared');
   }
   
-  // Clear only the city filter
   clearCityFilter(): void {
     this.filter.city = undefined;
     this.pendingFilter.city = undefined;

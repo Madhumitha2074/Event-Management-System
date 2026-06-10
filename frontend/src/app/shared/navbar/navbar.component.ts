@@ -60,7 +60,7 @@ import { LocationPopupService } from '../../core/services/location-popup.service
             <ng-container *ngIf="isLoggedIn">
               <!-- City Selector Button -->
               <li class="nav-item me-2">
-                <button class="btn btn-outline-light btn-sm" (click)="changeCity()">
+                <button class="btn btn-outline-light btn-sm" (click)="openLocationPopup()">
                   <i class="fas fa-map-marker-alt me-1"></i>
                   {{ selectedCity || 'Select City' }}
                   <i class="fas fa-chevron-down ms-1"></i>
@@ -103,7 +103,7 @@ import { LocationPopupService } from '../../core/services/location-popup.service
 
                   <!-- Change City option in dropdown -->
                   <li>
-                    <a class="dropdown-item" (click)="changeCity()">
+                    <a class="dropdown-item" (click)="openLocationPopup()">
                       <i class="fas fa-map-marker-alt me-2"></i>Change City
                     </a>
                   </li>
@@ -152,12 +152,19 @@ export class NavbarComponent implements OnInit {
     });
   }
 
-  // Method to change city
-  changeCity(): void {
-    // Clear selected city
-    this.authService.clearSelectedCity();
-    // Show location popup
+  // Method to open location popup
+  openLocationPopup(): void {
+    // First clear the selected city to show the popup with no selection
+    // Comment this line if you want to keep the current selection when reopening
+    // this.authService.clearSelectedCity();
+    
+    // Show the location popup
     this.locationPopupService.show();
+  }
+
+  // Method to change city (alias for openLocationPopup)
+  changeCity(): void {
+    this.openLocationPopup();
   }
 
   logout(): void {

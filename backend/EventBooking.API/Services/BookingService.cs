@@ -16,6 +16,9 @@ namespace EventBooking.API.Services
         Task CancelBookingAsync(int id, int userId);
         Task<List<BookingDto>> GetEventBookingsAsync(int eventId, int organizerId);
         Task<byte[]> GenerateBookingPdfAsync(int bookingId, int userId);
+        
+        // NEW: Verify ticket via QR code
+        Task<TicketVerificationDto> VerifyTicketAsync(string qrData);
     }
 
     public class BookingService : IBookingService
@@ -23,12 +26,16 @@ namespace EventBooking.API.Services
         private readonly DatabaseHelper _db;
         private readonly IEmailService _emailService;
         private readonly PdfService _pdfService;
+        private readonly IQrCodeService _qrCodeService;
+        private readonly ILogger<BookingService> _logger;
 
-        public BookingService(DatabaseHelper db, IEmailService emailService)
+        public BookingService(DatabaseHelper db, IEmailService emailService, IQrCodeService qrCodeService, ILogger<BookingService> logger)
         {
             _db = db;
             _emailService = emailService;
+            _qrCodeService = qrCodeService;
             _pdfService = new PdfService();
+            _logger = logger;
         }
 
         // ─────────────────────────────────────────────
@@ -107,7 +114,7 @@ namespace EventBooking.API.Services
                     bookingId = Convert.ToInt32(scalar);
                 }
 
-                // ── Step 3: Insert Tickets (one per attendee) ───────────────
+                // ── Step 3: Insert Tickets (one per attendee) with QR codes ───
                 var ticketDtos = new List<TicketDto>();
 
                 foreach (var attendee in dto.Attendees)
@@ -131,13 +138,25 @@ namespace EventBooking.API.Services
                     var ticketScalar = await ticketCmd.ExecuteScalarAsync();
                     int ticketId = Convert.ToInt32(ticketScalar);
 
+                    // FIXED: Generate QR code with proper null handling
+                    string ticketData = $"{ticketNumber}|{bookingId}|{attendee.Email.Trim().ToLower()}";
+                    byte[]? qrCodeBytes = _qrCodeService.GenerateQrCodeBytes(ticketData);
+                    string? qrCodeBase64 = null;
+
+                    if (qrCodeBytes != null)
+                    {
+                        qrCodeBase64 = Convert.ToBase64String(qrCodeBytes);
+                    }
+
                     ticketDtos.Add(new TicketDto
                     {
                         Id = ticketId,
                         TicketNumber = ticketNumber,
                         AttendeeName = attendee.Name.Trim(),
                         AttendeeEmail = attendee.Email.Trim().ToLower(),
-                        IsUsed = false
+                        IsUsed = false,
+                        QrCodeBase64 = qrCodeBase64,
+                        QrCodeBytes = qrCodeBytes
                     });
                 }
 
@@ -178,14 +197,13 @@ namespace EventBooking.API.Services
             }
             catch
             {
-                // ✅ Roll back everything if any step throws
                 await transaction.RollbackAsync();
                 throw;
             }
         }
 
         // ─────────────────────────────────────────────
-        // CREATE BOOKING WITH SEATS (Stored Procedure)
+        // CREATE BOOKING WITH SEATS (Stored Procedure with QR codes)
         // ─────────────────────────────────────────────
         public async Task<BookingDto> CreateBookingWithSeatsAsync(CreateBookingWithSeatsDto dto, int userId)
         {
@@ -304,7 +322,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // GET BOOKING BY ID (includes tickets)
+        // GET BOOKING BY ID (includes tickets with QR codes)
         // ─────────────────────────────────────────────
         public async Task<BookingDto> GetBookingByIdAsync(int id, int userId)
         {
@@ -349,7 +367,7 @@ namespace EventBooking.API.Services
                 };
             }
 
-            // ── Load Tickets for this booking ───────────────────────────────
+            // ── Load Tickets with QR codes for this booking ─────────────────
             string ticketQuery = @"
                 SELECT Id, TicketNumber, AttendeeName, AttendeeEmail, IsUsed
                 FROM   Tickets
@@ -363,18 +381,111 @@ namespace EventBooking.API.Services
 
                 while (await ticketReader.ReadAsync())
                 {
+                    string ticketNumber = ticketReader["TicketNumber"].ToString()!;
+                    string attendeeEmail = ticketReader["AttendeeEmail"].ToString()!;
+                    string ticketData = $"{ticketNumber}|{id}|{attendeeEmail}";
+                    
+                    // FIXED: Add null check
+                    byte[]? qrCodeBytes = _qrCodeService.GenerateQrCodeBytes(ticketData);
+                    string? qrCodeBase64 = null;
+                    
+                    if (qrCodeBytes != null)
+                    {
+                        qrCodeBase64 = Convert.ToBase64String(qrCodeBytes);
+                    }
+
                     booking.Tickets.Add(new TicketDto
                     {
                         Id = Convert.ToInt32(ticketReader["Id"]),
-                        TicketNumber = ticketReader["TicketNumber"].ToString()!,
+                        TicketNumber = ticketNumber,
                         AttendeeName = ticketReader["AttendeeName"].ToString()!,
-                        AttendeeEmail = ticketReader["AttendeeEmail"].ToString()!,
-                        IsUsed = Convert.ToBoolean(ticketReader["IsUsed"])
+                        AttendeeEmail = attendeeEmail,
+                        IsUsed = Convert.ToBoolean(ticketReader["IsUsed"]),
+                        QrCodeBase64 = qrCodeBase64,
+                        QrCodeBytes = qrCodeBytes
                     });
                 }
             }
 
             return booking;
+        }
+
+        // ─────────────────────────────────────────────
+        // GET TICKETS WITH QR CODES (FOR EMAIL SERVICE)
+        // ─────────────────────────────────────────────
+        private async Task<List<TicketDto>> GetTicketsWithQrCodesAsync(int bookingId, SqlConnection connection)
+        {
+            var tickets = new List<TicketDto>();
+
+            string ticketQuery = @"
+                SELECT t.Id, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, 
+                       t.IsUsed, t.SeatId, es.SeatNumber, es.Tier, es.Price
+                FROM Tickets t
+                LEFT JOIN EventSeats es ON t.SeatId = es.Id
+                WHERE t.BookingId = @BookingId";
+
+            using (var cmd = new SqlCommand(ticketQuery, connection))
+            {
+                cmd.Parameters.AddWithValue("@BookingId", bookingId);
+
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        string ticketNumber = reader["TicketNumber"].ToString()!;
+                        string attendeeEmail = reader["AttendeeEmail"].ToString()!;
+                        
+                        byte[]? qrCodeBytes = null;
+                        string? qrCodeBase64 = null;
+                        
+                        try
+                        {
+                            // Generate QR code for each ticket
+                            string ticketData = $"{ticketNumber}|{bookingId}|{attendeeEmail}";
+                            qrCodeBytes = _qrCodeService.GenerateQrCodeBytes(ticketData);
+                            
+                            // FIXED: Add null check before converting
+                            if (qrCodeBytes != null)
+                            {
+                                qrCodeBase64 = Convert.ToBase64String(qrCodeBytes);
+                                _logger.LogInformation("QR Code generated for ticket {TicketNumber}, Length: {Length}", 
+                                    ticketNumber, qrCodeBase64.Length);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("QR Code generation returned null for ticket {TicketNumber}", ticketNumber);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to generate QR code for ticket {TicketNumber}", ticketNumber);
+                        }
+
+                        var ticket = new TicketDto
+                        {
+                            Id = Convert.ToInt32(reader["Id"]),
+                            TicketNumber = ticketNumber,
+                            AttendeeName = reader["AttendeeName"].ToString()!,
+                            AttendeeEmail = attendeeEmail,
+                            IsUsed = Convert.ToBoolean(reader["IsUsed"]),
+                            QrCodeBase64 = qrCodeBase64,
+                            QrCodeBytes = qrCodeBytes
+                        };
+
+                        // Add seat info if available
+                        if (reader["SeatNumber"] != DBNull.Value)
+                        {
+                            ticket.SeatNumber = reader["SeatNumber"].ToString();
+                            ticket.Tier = reader["Tier"].ToString();
+                            ticket.SeatPrice = reader["Price"] != DBNull.Value ? Convert.ToDecimal(reader["Price"]) : null;
+                        }
+
+                        tickets.Add(ticket);
+                    }
+                }
+            }
+
+            return tickets;
         }
 
         // ─────────────────────────────────────────────
@@ -549,6 +660,62 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
+        // VERIFY TICKET VIA QR CODE
+        // ─────────────────────────────────────────────
+        public async Task<TicketVerificationDto> VerifyTicketAsync(string qrData)
+        {
+            // Parse QR data (format: "TKT-XXXX|BookingId|Email")
+            var parts = qrData.Split('|');
+            if (parts.Length < 3)
+                throw new ArgumentException("Invalid QR code data. Expected format: TicketNumber|BookingId|Email");
+
+            string ticketNumber = parts[0];
+            if (!int.TryParse(parts[1], out int bookingId))
+                throw new ArgumentException("Invalid Booking ID in QR code");
+
+            string email = parts[2];
+
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            string query = @"
+                SELECT t.Id, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, t.IsUsed,
+                       b.EventId, e.Title as EventTitle, e.Venue, e.City,
+                       b.BookingReference
+                FROM Tickets t
+                INNER JOIN Bookings b ON t.BookingId = b.Id
+                INNER JOIN Events e ON b.EventId = e.Id
+                WHERE t.TicketNumber = @TicketNumber AND t.AttendeeEmail = @Email";
+
+            using var cmd = new SqlCommand(query, connection);
+            cmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
+            cmd.Parameters.AddWithValue("@Email", email);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            
+            if (!await reader.ReadAsync())
+                throw new KeyNotFoundException("Ticket not found. Please verify the QR code.");
+
+            bool isUsed = Convert.ToBoolean(reader["IsUsed"]);
+            
+            var result = new TicketVerificationDto
+            {
+                TicketNumber = ticketNumber,
+                AttendeeName = reader["AttendeeName"].ToString()!,
+                AttendeeEmail = reader["AttendeeEmail"].ToString()!,
+                EventTitle = reader["EventTitle"].ToString()!,
+                Venue = reader["Venue"].ToString()!,
+                City = reader["City"].ToString()!,
+                BookingReference = reader["BookingReference"].ToString()!,
+                IsUsed = isUsed,
+                IsValid = !isUsed,
+                VerifiedAt = DateTime.UtcNow
+            };
+
+            return result;
+        }
+
+        // ─────────────────────────────────────────────
         // PRIVATE HELPERS
         // ─────────────────────────────────────────────
         private static string GenerateReference()
@@ -560,5 +727,20 @@ namespace EventBooking.API.Services
         {
             return $"TKT-{Guid.NewGuid().ToString()[..8].ToUpper()}";
         }
+    }
+
+    // DTO for ticket verification
+    public class TicketVerificationDto
+    {
+        public string TicketNumber { get; set; } = string.Empty;
+        public string AttendeeName { get; set; } = string.Empty;
+        public string AttendeeEmail { get; set; } = string.Empty;
+        public string EventTitle { get; set; } = string.Empty;
+        public string Venue { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string BookingReference { get; set; } = string.Empty;
+        public bool IsUsed { get; set; }
+        public bool IsValid { get; set; }
+        public DateTime VerifiedAt { get; set; }
     }
 }

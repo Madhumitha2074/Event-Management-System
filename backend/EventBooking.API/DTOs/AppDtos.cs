@@ -110,6 +110,9 @@ namespace EventBooking.API.DTOs
 
         // ✅ NEW — optional seat tier configuration
         public List<SeatTierConfigDto>? SeatTiers { get; set; }
+
+        // ✅ NEW — Google Maps URL for location
+        public string? GoogleMapsUrl { get; set; }
     }
 
     public class UpdateEventDto : CreateEventDto
@@ -132,7 +135,7 @@ namespace EventBooking.API.DTOs
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
         public decimal TicketPrice { get; set; }
-        public decimal MinPrice { get; set; }      // NEW
+        public decimal MinPrice { get; set; }
         public decimal MaxPrice { get; set; }
         public int TotalTickets { get; set; }
         public int BookedTickets { get; set; }
@@ -141,7 +144,8 @@ namespace EventBooking.API.DTOs
         public int OrganizerId { get; set; }
         public string CreatedAt { get; set; } = string.Empty;
         public bool HasSeatMap { get; set; }
-        public string? SeatConfig { get; set; }  // ADD THIS - JSON string of seat configuration
+        public string? SeatConfig { get; set; }
+        public string? GoogleMapsUrl { get; set; }  // ✅ NEW - Google Maps URL
     }
 
     public class EventFilterDto
@@ -249,5 +253,7 @@ namespace EventBooking.API.DTOs
         public string? SeatNumber { get; set; }
         public string? Tier { get; set; }
         public decimal? SeatPrice { get; set; }
+        public string? QrCodeBase64 { get; set; }
+        public byte[]? QrCodeBytes { get; set; }
     }
 }

@@ -73,6 +73,8 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                       </div>
                     </div>
                   </div>
+                  
+                  <!-- Location with Google Maps Link -->
                   <div class="col-md-6">
                     <div class="info-item">
                       <div class="info-icon">
@@ -80,11 +82,20 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                       </div>
                       <div class="info-content">
                         <div class="info-label">Location</div>
-                        <div class="info-value">{{ event.venue }}</div>
-                        <div class="info-small">{{ event.city }}{{ event.address ? ', ' + event.address : '' }}</div>
+                        <div class="info-value">
+                          <a [href]="getGoogleMapsUrl()" 
+                             target="_blank" 
+                             rel="noopener noreferrer"
+                             class="text-decoration-none">
+                            {{ event.venue }}, {{ event.city }}
+                            <i class="fas fa-external-link-alt ms-1 small"></i>
+                          </a>
+                        </div>
+                        <div class="info-small">{{ event.address }}</div>
                       </div>
                     </div>
                   </div>
+                  
                   <div class="col-md-6">
                     <div class="info-item">
                       <div class="info-icon">
@@ -103,6 +114,7 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                       </div>
                     </div>
                   </div>
+                  
                   <div class="col-md-6">
                     <div class="info-item">
                       <div class="info-icon">
@@ -111,12 +123,10 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                       <div class="info-content">
                         <div class="info-label">Price Range</div>
                         <div class="info-value fw-bold text-primary">
-                          <!-- Show price range if seat map exists and has different prices -->
                           <ng-container *ngIf="hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
                             ₹{{ event.minPrice }} - ₹{{ event.maxPrice }}
                             <span class="info-small d-block">per seat (varies by tier)</span>
                           </ng-container>
-                          <!-- Show single price for events without seat map or same price tiers -->
                           <ng-container *ngIf="!hasSeatMap || (event.minPrice === event.maxPrice)">
                             {{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
                             <span class="info-small d-block">per person</span>
@@ -133,176 +143,195 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
           <!-- Booking Panel - Right Column -->
           <div class="col-lg-5" [class.col-lg-12]="enableSeatSelection && hasSeatMap">
             
-            <!-- Seat Map Toggle Card -->
-            <div class="booking-card" *ngIf="hasSeatMap">
-              <div class="booking-card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <i class="fas fa-chair me-2 text-primary"></i>
-                    <span class="fw-semibold">Select Specific Seats</span>
-                  </div>
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" 
-                           id="seatSelectionToggle" 
-                           [(ngModel)]="enableSeatSelection"
-                           (ngModelChange)="onSeatToggleChange($event)"
-                           [disabled]="selectionDisabled"
-                           style="width: 50px; height: 25px; cursor: pointer;">
-                  </div>
-                </div>
-                <div class="text-muted small mt-2" *ngIf="!enableSeatSelection">
-                  <i class="fas fa-info-circle me-1"></i>Toggle on to choose your specific seats
-                </div>
-              </div>
-            </div>
-
-            <!-- Seat Map Component -->
-            <div *ngIf="enableSeatSelection && hasSeatMap && seats.length > 0" class="mt-3">
-              <app-seat-map
-                #seatMapRef
-                [seats]="seats"
-                [maxSelectable]="10"
-                [selectionDisabled]="selectionDisabled"
-                [loading]="loadingSeats"
-                (selectionChange)="onSeatSelectionChange($event)">
-              </app-seat-map>
-            </div>
-
-            <!-- Loading seats indicator -->
-            <div *ngIf="enableSeatSelection && hasSeatMap && seats.length === 0 && loadingSeats" 
-                 class="booking-card mt-3 text-center py-4">
-              <div class="spinner-border text-primary mb-2"></div>
-              <p class="text-muted mb-0">Loading seat map...</p>
-            </div>
-
-            <!-- Traditional Booking Card -->
-            <div class="booking-card mt-3" *ngIf="!enableSeatSelection || !hasSeatMap">
-              <div class="booking-card-header">
-                <i class="fas fa-ticket-alt me-2"></i>
-                <span class="fw-bold">Book Your Tickets</span>
-              </div>
-              <div class="booking-card-body">
-                <div class="price-display text-center mb-4">
-                  <!-- Show price range if seat map exists -->
-                  <ng-container *ngIf="hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
-                    <div class="price-amount">₹{{ event.minPrice }} - ₹{{ event.maxPrice }}</div>
-                    <div class="price-label">per seat (by tier)</div>
-                  </ng-container>
-                  <ng-container *ngIf="!hasSeatMap || (event.minPrice === event.maxPrice)">
-                    <div class="price-amount">
-                      {{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
+            <!-- For Regular Users - Show Booking Options -->
+            <ng-container *ngIf="!isOrganizer">
+              
+              <!-- Seat Map Toggle Card -->
+              <div class="booking-card" *ngIf="hasSeatMap">
+                <div class="booking-card-body">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <i class="fas fa-chair me-2 text-primary"></i>
+                      <span class="fw-semibold">Select Specific Seats</span>
                     </div>
-                    <div class="price-label">per ticket</div>
-                  </ng-container>
-                </div>
-
-                <div class="availability-info mb-3">
-                  <div class="d-flex justify-content-between">
-                    <span class="text-muted">Available Tickets</span>
-                    <span class="fw-bold" [class.text-warning]="event.availableTickets < 50" 
-                          [class.text-danger]="event.availableTickets < 20">
-                      {{ event.availableTickets }} left
-                    </span>
-                  </div>
-                  <div class="progress mt-1" style="height: 4px;">
-                    <div class="progress-bar bg-primary" 
-                         [style.width.%]="(event.bookedTickets / event.totalTickets) * 100">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" 
+                             id="seatSelectionToggle" 
+                             [(ngModel)]="enableSeatSelection"
+                             (ngModelChange)="onSeatToggleChange($event)"
+                             [disabled]="selectionDisabled"
+                             style="width: 50px; height: 25px; cursor: pointer;">
                     </div>
                   </div>
-                </div>
-
-                <div *ngIf="event.availableTickets === 0" class="alert alert-danger text-center mb-0">
-                  <i class="fas fa-times-circle me-2"></i>Sold Out
-                </div>
-
-                <form *ngIf="event.availableTickets > 0 && isLoggedIn" [formGroup]="bookingForm" (ngSubmit)="book()">
-                  <div class="mb-3">
-                    <label class="form-label fw-semibold">Number of Tickets</label>
-                    <select class="form-select" formControlName="ticketCount" (change)="updateAttendees()" 
-                            [disabled]="bookingLoading">
-                      <option *ngFor="let n of ticketOptions" [value]="n">{{ n }} ticket(s)</option>
-                    </select>
+                  <div class="text-muted small mt-2" *ngIf="!enableSeatSelection">
+                    <i class="fas fa-info-circle me-1"></i>Toggle on to choose your specific seats
                   </div>
+                </div>
+              </div>
 
-                  <div formArrayName="attendees">
-                    <div *ngFor="let attendee of attendeesArray.controls; let i = index" 
-                         [formGroupName]="i" class="attendee-card mb-3">
-                      <div class="attendee-header">
-                        <i class="fas fa-user me-2"></i>
-                        <span>Attendee {{ i + 1 }}</span>
+              <!-- Seat Map Component -->
+              <div *ngIf="enableSeatSelection && hasSeatMap && seats.length > 0" class="mt-3">
+                <app-seat-map
+                  #seatMapRef
+                  [seats]="seats"
+                  [maxSelectable]="10"
+                  [selectionDisabled]="selectionDisabled"
+                  [loading]="loadingSeats"
+                  (selectionChange)="onSeatSelectionChange($event)">
+                </app-seat-map>
+              </div>
+
+              <!-- Loading seats indicator -->
+              <div *ngIf="enableSeatSelection && hasSeatMap && seats.length === 0 && loadingSeats" 
+                   class="booking-card mt-3 text-center py-4">
+                <div class="spinner-border text-primary mb-2"></div>
+                <p class="text-muted mb-0">Loading seat map...</p>
+              </div>
+
+              <!-- Traditional Booking Card -->
+              <div class="booking-card mt-3" *ngIf="!enableSeatSelection || !hasSeatMap">
+                <div class="booking-card-header">
+                  <i class="fas fa-ticket-alt me-2"></i>
+                  <span class="fw-bold">Book Your Tickets</span>
+                </div>
+                <div class="booking-card-body">
+                  <div class="price-display text-center mb-4">
+                    <ng-container *ngIf="hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
+                      <div class="price-amount">₹{{ event.minPrice }} - ₹{{ event.maxPrice }}</div>
+                      <div class="price-label">per seat (by tier)</div>
+                    </ng-container>
+                    <ng-container *ngIf="!hasSeatMap || (event.minPrice === event.maxPrice)">
+                      <div class="price-amount">
+                        {{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}
                       </div>
-                      <div class="attendee-body">
-                        <input class="form-control form-control-sm mb-2" 
-                               formControlName="name" 
-                               placeholder="Full Name">
-                        <input class="form-control form-control-sm" 
-                               formControlName="email" 
-                               placeholder="Email Address" 
-                               type="email">
+                      <div class="price-label">per ticket</div>
+                    </ng-container>
+                  </div>
+
+                  <div class="availability-info mb-3">
+                    <div class="d-flex justify-content-between">
+                      <span class="text-muted">Available Tickets</span>
+                      <span class="fw-bold" [class.text-warning]="event.availableTickets < 50" 
+                            [class.text-danger]="event.availableTickets < 20">
+                        {{ event.availableTickets }} left
+                      </span>
+                    </div>
+                    <div class="progress mt-1" style="height: 4px;">
+                      <div class="progress-bar bg-primary" 
+                           [style.width.%]="(event.bookedTickets / event.totalTickets) * 100">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div *ngIf="event.availableTickets === 0" class="alert alert-danger text-center mb-0">
+                    <i class="fas fa-times-circle me-2"></i>Sold Out
+                  </div>
+
+                  <form *ngIf="event.availableTickets > 0 && isLoggedIn" [formGroup]="bookingForm" (ngSubmit)="book()">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Number of Tickets</label>
+                      <select class="form-select" formControlName="ticketCount" (change)="updateAttendees()" 
+                              [disabled]="bookingLoading">
+                        <option *ngFor="let n of ticketOptions" [value]="n">{{ n }} ticket(s)</option>
+                      </select>
+                    </div>
+
+                    <div formArrayName="attendees">
+                      <div *ngFor="let attendee of attendeesArray.controls; let i = index" 
+                           [formGroupName]="i" class="attendee-card mb-3">
+                        <div class="attendee-header">
+                          <i class="fas fa-user me-2"></i>
+                          <span>Attendee {{ i + 1 }}</span>
+                        </div>
+                        <div class="attendee-body">
+                          <input class="form-control form-control-sm mb-2" 
+                                 formControlName="name" 
+                                 placeholder="Full Name">
+                          <input class="form-control form-control-sm" 
+                                 formControlName="email" 
+                                 placeholder="Email Address" 
+                                 type="email">
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="total-amount mt-3">
+                      <span>Total Amount</span>
+                      <span class="amount">{{ getTotalAmount() | currency:'INR':'symbol':'1.2-2' }}</span>
+                    </div>
+
+                    <button class="btn-book w-100 mt-3" type="submit" [disabled]="bookingLoading">
+                      <span *ngIf="bookingLoading" class="spinner-border spinner-border-sm me-2"></span>
+                      <i *ngIf="!bookingLoading" class="fas fa-check-circle me-2"></i>
+                      {{ bookingLoading ? 'Processing...' : 'Confirm Booking' }}
+                    </button>
+                  </form>
+
+                  <div *ngIf="!isLoggedIn" class="text-center py-3">
+                    <p class="text-muted mb-2">Sign in to book tickets</p>
+                    <a routerLink="/auth/login" class="btn btn-primary w-100">Sign In</a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Seat-based booking summary -->
+              <div *ngIf="enableSeatSelection && hasSeatMap && selectedSeats.length > 0" class="booking-card mt-3">
+                <div class="booking-card-header">
+                  <i class="fas fa-shopping-cart me-2"></i>
+                  <span class="fw-bold">Booking Summary</span>
+                  <span class="ms-auto badge bg-primary rounded-pill">{{ selectedSeats.length }} seat(s)</span>
+                </div>
+                <div class="booking-card-body">
+                  <div class="selected-seats-grid">
+                    <div *ngFor="let seat of selectedSeats; let i = index" class="selected-seat-item">
+                      <div class="seat-info">
+                        <span class="seat-number">{{ seat.seatNumber }}</span>
+                        <span class="seat-tier">{{ seat.tier }}</span>
+                        <span class="seat-price">₹{{ seat.price }}</span>
+                      </div>
+                      <div class="attendee-inputs">
+                        <input type="text" class="form-control form-control-sm" 
+                               placeholder="Full Name" [(ngModel)]="seatAttendees[i].name" 
+                               [ngModelOptions]="{standalone: true}"
+                               [disabled]="bookingLoading || selectionDisabled">
+                        <input type="email" class="form-control form-control-sm mt-1" 
+                               placeholder="Email" [(ngModel)]="seatAttendees[i].email"
+                               [ngModelOptions]="{standalone: true}"
+                               [disabled]="bookingLoading || selectionDisabled">
                       </div>
                     </div>
                   </div>
 
                   <div class="total-amount mt-3">
                     <span>Total Amount</span>
-                    <span class="amount">{{ getTotalAmount() | currency:'INR':'symbol':'1.2-2' }}</span>
+                    <span class="amount">₹{{ seatTotalAmount | number:'1.2-2' }}</span>
                   </div>
 
-                  <button class="btn-book w-100 mt-3" type="submit" [disabled]="bookingLoading">
+                  <button class="btn-book w-100 mt-3" (click)="bookWithSeats()" 
+                          [disabled]="bookingLoading || !isSeatAttendeesValid() || selectionDisabled">
                     <span *ngIf="bookingLoading" class="spinner-border spinner-border-sm me-2"></span>
                     <i *ngIf="!bookingLoading" class="fas fa-check-circle me-2"></i>
-                    {{ bookingLoading ? 'Processing...' : 'Confirm Booking' }}
+                    {{ bookingLoading ? 'Processing...' : 'Confirm & Book' }}
                   </button>
-                </form>
-
-                <div *ngIf="!isLoggedIn" class="text-center py-3">
-                  <p class="text-muted mb-2">Sign in to book tickets</p>
-                  <a routerLink="/auth/login" class="btn btn-primary w-100">Sign In</a>
                 </div>
               </div>
-            </div>
 
-            <!-- Seat-based booking summary -->
-            <div *ngIf="enableSeatSelection && hasSeatMap && selectedSeats.length > 0" class="booking-card mt-3">
-              <div class="booking-card-header">
-                <i class="fas fa-shopping-cart me-2"></i>
-                <span class="fw-bold">Booking Summary</span>
-                <span class="ms-auto badge bg-primary rounded-pill">{{ selectedSeats.length }} seat(s)</span>
-              </div>
-              <div class="booking-card-body">
-                <div class="selected-seats-grid">
-                  <div *ngFor="let seat of selectedSeats; let i = index" class="selected-seat-item">
-                    <div class="seat-info">
-                      <span class="seat-number">{{ seat.seatNumber }}</span>
-                      <span class="seat-tier">{{ seat.tier }}</span>
-                      <span class="seat-price">₹{{ seat.price }}</span>
-                    </div>
-                    <div class="attendee-inputs">
-                      <input type="text" class="form-control form-control-sm" 
-                             placeholder="Full Name" [(ngModel)]="seatAttendees[i].name" 
-                             [ngModelOptions]="{standalone: true}"
-                             [disabled]="bookingLoading || selectionDisabled">
-                      <input type="email" class="form-control form-control-sm mt-1" 
-                             placeholder="Email" [(ngModel)]="seatAttendees[i].email"
-                             [ngModelOptions]="{standalone: true}"
-                             [disabled]="bookingLoading || selectionDisabled">
-                    </div>
-                  </div>
+            </ng-container>
+
+            <!-- For Organizers - Show info message instead of booking panel -->
+            <ng-container *ngIf="isOrganizer">
+              <div class="card border-0 shadow rounded-4">
+                <div class="card-body text-center py-5">
+                  <i class="fas fa-chalkboard-user fa-4x text-muted mb-3"></i>
+                  <h5 class="text-muted">Organizer View</h5>
+                  <p class="text-muted">You are viewing this event as an organizer.</p>
+                  <p class="text-muted small">Booking is only available for regular users.</p>
+                  <a routerLink="/organizer" class="btn btn-primary mt-2">
+                    <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                  </a>
                 </div>
-
-                <div class="total-amount mt-3">
-                  <span>Total Amount</span>
-                  <span class="amount">₹{{ seatTotalAmount | number:'1.2-2' }}</span>
-                </div>
-
-                <button class="btn-book w-100 mt-3" (click)="bookWithSeats()" 
-                        [disabled]="bookingLoading || !isSeatAttendeesValid() || selectionDisabled">
-                  <span *ngIf="bookingLoading" class="spinner-border spinner-border-sm me-2"></span>
-                  <i *ngIf="!bookingLoading" class="fas fa-check-circle me-2"></i>
-                  {{ bookingLoading ? 'Processing...' : 'Confirm & Book' }}
-                </button>
               </div>
-            </div>
+            </ng-container>
 
           </div>
         </div>
@@ -371,6 +400,14 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
       font-size: 1rem;
       font-weight: 600;
       color: #2d3748;
+    }
+    .info-value a {
+      color: #2d3748;
+      transition: color 0.2s;
+    }
+    .info-value a:hover {
+      color: #6c5ce7;
+      text-decoration: underline;
     }
     .info-small {
       font-size: 0.8rem;
@@ -517,6 +554,7 @@ export class EventDetailComponent implements OnInit {
   bookingForm!: FormGroup;
   bookingLoading = false;
   isLoggedIn = false;
+  isOrganizer = false;  // NEW: Track if user is organizer
   enableSeatSelection = false;
   hasSeatMap = false;
   selectionDisabled = false;
@@ -533,7 +571,12 @@ export class EventDetailComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.isLoggedIn = this.authService.isLoggedIn;
+    // Subscribe to auth state to check user role
+    this.authService.currentUser$.subscribe(user => {
+      this.isLoggedIn = !!user;
+      this.isOrganizer = user?.role === 'Organizer' || user?.role === 'Admin';
+    });
+    
     this.bookingForm = this.fb.group({
       ticketCount: [1],
       attendees: this.fb.array([this.createAttendee()])
@@ -559,7 +602,30 @@ export class EventDetailComponent implements OnInit {
     }
   }
 
-  // New method to handle seat toggle change
+  // Helper method to generate Google Maps URL with proper error handling
+  getGoogleMapsUrl(): string {
+    if (!this.event) return '#';
+    
+    // If custom URL is provided and valid, use it
+    if (this.event.googleMapsUrl && this.event.googleMapsUrl.startsWith('http')) {
+      return this.event.googleMapsUrl;
+    }
+    
+    // Build search query from venue and city
+    const searchQuery = `${this.event.venue}, ${this.event.city}`.trim();
+    
+    // Fallback if query is empty
+    if (!searchQuery || searchQuery.length < 3) {
+      console.warn('Incomplete location data for event:', this.event.id);
+      return '#';
+    }
+    
+    // Encode and return Google Maps URL
+    const encodedQuery = encodeURIComponent(searchQuery);
+    return `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
+  }
+
+  // Method to handle seat toggle change
   onSeatToggleChange(enabled: boolean): void {
     this.enableSeatSelection = enabled;
     if (enabled) {

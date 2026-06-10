@@ -145,6 +145,7 @@ namespace EventBooking.API.Services
                        e.OrganizerId,
                        e.CreatedAt,
                        e.SeatConfig,
+                       e.GoogleMapsUrl,
                        u.Name AS OrganizerName
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
@@ -197,6 +198,7 @@ namespace EventBooking.API.Services
                        e.OrganizerId,
                        e.CreatedAt,
                        e.SeatConfig,
+                       e.GoogleMapsUrl,
                        u.Name AS OrganizerName
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
@@ -255,13 +257,13 @@ namespace EventBooking.API.Services
                         (Title, Description, Category, Status,
                          StartDateTime, EndDateTime, Venue, City,
                          Address, ImageUrl, TicketPrice, TotalTickets,
-                         BookedTickets, OrganizerId, SeatConfig)
+                         BookedTickets, OrganizerId, SeatConfig, GoogleMapsUrl)
                     OUTPUT INSERTED.Id
                     VALUES
                         (@Title, @Description, @Category, 'Draft',
                          @StartDateTime, @EndDateTime, @Venue, @City,
                          @Address, @ImageUrl, @TicketPrice, @TotalTickets,
-                         0, @OrganizerId, @SeatConfig)";
+                         0, @OrganizerId, @SeatConfig, @GoogleMapsUrl)";
 
                 using var cmd = new SqlCommand(query, connection, transaction);
 
@@ -280,6 +282,7 @@ namespace EventBooking.API.Services
                 cmd.Parameters.AddWithValue("@TotalTickets", totalTickets);
                 cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
                 cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("@GoogleMapsUrl", dto.GoogleMapsUrl ?? (object)DBNull.Value);
 
                 var scalar = await cmd.ExecuteScalarAsync();
                 int eventId = Convert.ToInt32(scalar);
@@ -359,6 +362,7 @@ namespace EventBooking.API.Services
                        TicketPrice   = @TicketPrice,
                        TotalTickets  = @TotalTickets,
                        SeatConfig    = @SeatConfig,
+                       GoogleMapsUrl = @GoogleMapsUrl,
                        UpdatedAt     = @UpdatedAt
                 WHERE  Id = @Id AND OrganizerId = @OrganizerId";
 
@@ -381,6 +385,7 @@ namespace EventBooking.API.Services
             cmd.Parameters.AddWithValue("@TicketPrice", dto.TicketPrice);
             cmd.Parameters.AddWithValue("@TotalTickets", dto.TotalTickets);
             cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@GoogleMapsUrl", dto.GoogleMapsUrl ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
 
             await cmd.ExecuteNonQueryAsync();
@@ -404,42 +409,96 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // DELETE EVENT
+        // DELETE EVENT (Properly handles all foreign key constraints)
         // ─────────────────────────────────────────────
         public async Task DeleteEventAsync(int id, int organizerId)
         {
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
 
-            // ✅ Block delete if active bookings exist
-            string bookingCheck = @"
-                SELECT COUNT(1) FROM Bookings
-                WHERE  EventId = @EventId
-                AND    Status  IN ('Confirmed', 'Pending')";
-
-            using (var checkCmd = new SqlCommand(bookingCheck, connection))
+            try
             {
-                checkCmd.Parameters.AddWithValue("@EventId", id);
+                // ✅ Verify organizer owns the event
+                string ownerCheck = @"
+                    SELECT COUNT(1) FROM Events
+                    WHERE Id = @Id AND OrganizerId = @OrganizerId";
 
-                int activeBookings = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
-                if (activeBookings > 0)
-                    throw new InvalidOperationException(
-                        "Cannot delete event with active bookings. Cancel all bookings first.");
+                using (var checkCmd = new SqlCommand(ownerCheck, connection, transaction))
+                {
+                    checkCmd.Parameters.AddWithValue("@Id", id);
+                    checkCmd.Parameters.AddWithValue("@OrganizerId", organizerId);
+
+                    int count = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
+                    if (count == 0)
+                        throw new UnauthorizedAccessException("You do not own this event.");
+                }
+
+                // Check if there are any confirmed bookings
+                string bookingCheck = @"
+                    SELECT COUNT(1) FROM Bookings
+                    WHERE EventId = @EventId AND Status IN ('Confirmed', 'Pending')";
+
+                using (var checkBookingCmd = new SqlCommand(bookingCheck, connection, transaction))
+                {
+                    checkBookingCmd.Parameters.AddWithValue("@EventId", id);
+                    int activeBookings = Convert.ToInt32(await checkBookingCmd.ExecuteScalarAsync());
+                    
+                    if (activeBookings > 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Cannot delete event with {activeBookings} active booking(s). Please cancel all bookings first.");
+                    }
+                }
+
+                // Delete in correct order to avoid foreign key conflicts
+                
+                // 1. Delete tickets (through bookings)
+                string deleteTicketsQuery = @"
+                    DELETE FROM Tickets 
+                    WHERE BookingId IN (SELECT Id FROM Bookings WHERE EventId = @EventId)";
+                
+                using (var cmd1 = new SqlCommand(deleteTicketsQuery, connection, transaction))
+                {
+                    cmd1.Parameters.AddWithValue("@EventId", id);
+                    await cmd1.ExecuteNonQueryAsync();
+                }
+
+                // 2. Delete event seats
+                string deleteSeatsQuery = "DELETE FROM EventSeats WHERE EventId = @EventId";
+                using (var cmd2 = new SqlCommand(deleteSeatsQuery, connection, transaction))
+                {
+                    cmd2.Parameters.AddWithValue("@EventId", id);
+                    await cmd2.ExecuteNonQueryAsync();
+                }
+
+                // 3. Delete bookings
+                string deleteBookingsQuery = "DELETE FROM Bookings WHERE EventId = @EventId";
+                using (var cmd3 = new SqlCommand(deleteBookingsQuery, connection, transaction))
+                {
+                    cmd3.Parameters.AddWithValue("@EventId", id);
+                    await cmd3.ExecuteNonQueryAsync();
+                }
+
+                // 4. Finally delete the event
+                string deleteEventQuery = "DELETE FROM Events WHERE Id = @Id AND OrganizerId = @OrganizerId";
+                using (var cmd4 = new SqlCommand(deleteEventQuery, connection, transaction))
+                {
+                    cmd4.Parameters.AddWithValue("@Id", id);
+                    cmd4.Parameters.AddWithValue("@OrganizerId", organizerId);
+                    int rows = await cmd4.ExecuteNonQueryAsync();
+
+                    if (rows == 0)
+                        throw new UnauthorizedAccessException("Event not found or you do not own it.");
+                }
+
+                await transaction.CommitAsync();
             }
-
-            string query = @"
-                DELETE FROM Events
-                WHERE  Id          = @Id
-                AND    OrganizerId = @OrganizerId";
-
-            using var cmd = new SqlCommand(query, connection);
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
-
-            int rows = await cmd.ExecuteNonQueryAsync();
-
-            if (rows == 0)
-                throw new UnauthorizedAccessException("Event not found or you do not own it.");
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // ─────────────────────────────────────────────
@@ -471,6 +530,7 @@ namespace EventBooking.API.Services
                        e.OrganizerId,
                        e.CreatedAt,
                        e.SeatConfig,
+                       e.GoogleMapsUrl,
                        u.Name AS OrganizerName
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
@@ -500,6 +560,7 @@ namespace EventBooking.API.Services
             if (categoryIndex < 0) categoryIndex = 7;
 
             string? seatConfig = reader["SeatConfig"] == DBNull.Value ? null : reader["SeatConfig"].ToString();
+            string? googleMapsUrl = reader["GoogleMapsUrl"] == DBNull.Value ? null : reader["GoogleMapsUrl"].ToString();
             
             // Calculate min and max prices from seat configuration
             decimal ticketPrice = Convert.ToDecimal(reader["TicketPrice"]);
@@ -566,7 +627,8 @@ namespace EventBooking.API.Services
                 OrganizerName = reader["OrganizerName"].ToString()!,
                 CreatedAt = ((DateTime)reader["CreatedAt"]).ToString("o"),
                 HasSeatMap = !string.IsNullOrEmpty(seatConfig),
-                SeatConfig = seatConfig
+                SeatConfig = seatConfig,
+                GoogleMapsUrl = googleMapsUrl
             };
         }
     }

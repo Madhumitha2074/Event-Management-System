@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
+import { EventService } from '../../../core/services/event.service';
 import { ToastrService } from 'ngx-toastr';
 
 @Component({
@@ -33,6 +34,11 @@ import { ToastrService } from 'ngx-toastr';
                         'bg-success': profile.role === 'Organizer',
                         'bg-danger':  profile.role === 'Admin'
                       }">
+                  <i class="fas" [ngClass]="{
+                    'fa-user': profile.role === 'User',
+                    'fa-chalkboard-user': profile.role === 'Organizer',
+                    'fa-shield-alt': profile.role === 'Admin'
+                  }"></i>
                   {{ profile.role }}
                 </span>
               </div>
@@ -65,15 +71,62 @@ import { ToastrService } from 'ngx-toastr';
                   </div>
                 </div>
 
+                <!-- Organizer Stats Section -->
+                <div class="col-12 mt-3" *ngIf="profile.role === 'Organizer' || profile.role === 'Admin'">
+                  <hr>
+                  <h6 class="fw-bold mb-3">
+                    <i class="fas fa-chart-line text-primary me-2"></i>Organizer Dashboard
+                  </h6>
+                  
+                  <!-- Stats Cards -->
+                  <div class="row g-2 mb-3">
+                    <div class="col-6">
+                      <div class="card bg-light border-0 text-center p-2">
+                        <div class="small text-muted">Total Events</div>
+                        <div class="fs-4 fw-bold text-primary">{{ organizerStats.totalEvents }}</div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="card bg-light border-0 text-center p-2">
+                        <div class="small text-muted">Published</div>
+                        <div class="fs-4 fw-bold text-success">{{ organizerStats.publishedEvents }}</div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="card bg-light border-0 text-center p-2">
+                        <div class="small text-muted">Total Bookings</div>
+                        <div class="fs-4 fw-bold text-info">{{ organizerStats.totalBookings }}</div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="card bg-light border-0 text-center p-2">
+                        <div class="small text-muted">Revenue</div>
+                        <div class="fs-4 fw-bold text-warning">₹{{ organizerStats.totalRevenue | number:'1.0-0' }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
               <hr>
 
-              <!-- Action Buttons -->
+              <!-- Action Buttons - Different for Organizer and User -->
               <div class="d-grid gap-2">
-                <a routerLink="/bookings" class="btn btn-outline-primary">
-                  <i class="fas fa-ticket-alt me-2"></i>My Bookings
-                </a>
+                <!-- For Regular Users -->
+                <ng-container *ngIf="profile.role === 'User'">
+                  <a routerLink="/bookings" class="btn btn-outline-primary">
+                    <i class="fas fa-ticket-alt me-2"></i>My Bookings
+                  </a>
+                </ng-container>
+
+                <!-- For Organizers and Admins -->
+                <ng-container *ngIf="profile.role === 'Organizer' || profile.role === 'Admin'">
+                  <a routerLink="/organizer" class="btn btn-outline-success">
+                    <i class="fas fa-chalkboard-user me-2"></i>Organizer Dashboard
+                  </a>
+                </ng-container>
+
                 <button class="btn btn-outline-danger" (click)="logout()">
                   <i class="fas fa-sign-out-alt me-2"></i>Logout
                 </button>
@@ -96,20 +149,49 @@ import { ToastrService } from 'ngx-toastr';
 })
 export class ProfileComponent implements OnInit {
 
-  profile: any  = null;
-  loading       = true;
+  profile: any = null;
+  loading = true;
+  organizerStats = {
+    totalEvents: 0,
+    publishedEvents: 0,
+    totalBookings: 0,
+    totalRevenue: 0
+  };
 
   constructor(
     private authService: AuthService,
-    private toastr:      ToastrService
+    private eventService: EventService,
+    private toastr: ToastrService
   ) {}
 
   ngOnInit(): void {
     this.authService.getProfile().subscribe({
-      next:  (p) => { this.profile = p; this.loading = false; },
-      error: ()  => {
+      next: (p) => { 
+        this.profile = p; 
+        this.loading = false;
+        
+        // Load organizer stats if user is organizer or admin
+        if (this.profile.role === 'Organizer' || this.profile.role === 'Admin') {
+          this.loadOrganizerStats();
+        }
+      },
+      error: () => {
         this.toastr.error('Failed to load profile.');
         this.loading = false;
+      }
+    });
+  }
+
+  loadOrganizerStats(): void {
+    this.eventService.getMyEvents().subscribe({
+      next: (events) => {
+        this.organizerStats.totalEvents = events.length;
+        this.organizerStats.publishedEvents = events.filter(e => e.status === 'Published').length;
+        this.organizerStats.totalBookings = events.reduce((sum, e) => sum + e.bookedTickets, 0);
+        this.organizerStats.totalRevenue = events.reduce((sum, e) => sum + (e.bookedTickets * e.ticketPrice), 0);
+      },
+      error: () => {
+        console.error('Failed to load organizer stats');
       }
     });
   }

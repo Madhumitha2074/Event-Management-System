@@ -86,6 +86,35 @@ import { ToastrService } from 'ngx-toastr';
                            placeholder="123 Main Street, Chennai">
                   </div>
 
+                  <!-- Google Maps Location Link Field -->
+                  <div class="col-12">
+                    <label class="form-label">
+                      <i class="fab fa-google me-1 text-danger"></i>
+                      Google Maps Location Link 
+                      <small class="text-muted">(Optional)</small>
+                    </label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-white">
+                        <i class="fas fa-map-marker-alt text-danger"></i>
+                      </span>
+                      <input type="url" class="form-control" formControlName="googleMapsUrl" 
+                             placeholder="https://maps.google.com/?q=YMCA+Nandanam+Chennai">
+                      <button class="btn btn-outline-secondary" type="button" 
+                              (click)="openGoogleMapsHelp()" title="How to get Google Maps link">
+                        <i class="fas fa-question"></i>
+                      </button>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                      <i class="fas fa-info-circle me-1"></i>
+                      How to get link: 
+                      <strong>1.</strong> Open Google Maps → <strong>2.</strong> Search for venue → 
+                      <strong>3.</strong> Click "Share" → <strong>4.</strong> Copy link
+                    </small>
+                    <small class="text-muted d-block">
+                      Example: <code>https://maps.google.com/?q=YMCA+Nandanam+Chennai</code>
+                    </small>
+                  </div>
+
                   <!-- Seat Configuration Section -->
                   <div class="col-12 mt-3">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -255,10 +284,11 @@ export class EventFormComponent implements OnInit {
       city: ['', Validators.required],
       address: [''],
       imageUrl: [''],
+      googleMapsUrl: [''], // NEW: Google Maps location link
       ticketPrice: [0, [Validators.required, Validators.min(0)]],
       totalTickets: [100, [Validators.required, Validators.min(1)]],
       status: ['Draft'],
-      seatTiers: this.fb.array([])  // FormArray for seat tiers
+      seatTiers: this.fb.array([])
     });
 
     const id = this.route.snapshot.paramMap.get('id');
@@ -277,6 +307,7 @@ export class EventFormComponent implements OnInit {
           city: ev.city,
           address: ev.address ?? '',
           imageUrl: ev.imageUrl ?? '',
+          googleMapsUrl: ev.googleMapsUrl ?? '', // NEW
           ticketPrice: ev.ticketPrice,
           totalTickets: ev.totalTickets,
           status: ev.status
@@ -290,6 +321,11 @@ export class EventFormComponent implements OnInit {
         }
       });
     }
+  }
+
+  // Helper method to open Google Maps help
+  openGoogleMapsHelp(): void {
+    window.open('https://support.google.com/maps/answer/144361?co=GENIE.Platform%3DDesktop&hl=en', '_blank');
   }
 
   get seatTiersArray(): FormArray {
@@ -360,17 +396,16 @@ export class EventFormComponent implements OnInit {
       venue: this.form.value.venue,
       city: this.form.value.city,
       address: this.form.value.address,
-      imageUrl: this.form.value.imageUrl
+      imageUrl: this.form.value.imageUrl,
+      googleMapsUrl: this.form.value.googleMapsUrl // NEW: Include Google Maps URL
     };
 
     if (this.enableSeatConfig && this.seatTiersArray.length > 0) {
-      // Seat configuration mode
       const seatTiers = this.form.value.seatTiers;
       data.seatTiers = seatTiers;
       data.totalTickets = this.getTotalSeats();
       data.ticketPrice = this.getMinPrice();
     } else {
-      // Traditional mode
       data.ticketPrice = this.form.value.ticketPrice;
       data.totalTickets = this.form.value.totalTickets;
       data.seatTiers = null;

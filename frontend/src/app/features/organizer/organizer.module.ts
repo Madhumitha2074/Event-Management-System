@@ -5,16 +5,28 @@ import { RouterModule, Routes } from '@angular/router';
 import { OrganizerDashboardComponent } from './organizer-dashboard/organizer-dashboard.component';
 import { EventFormComponent } from './event-form/event-form.component';
 import { AttendeesComponent } from './attendees/attendees.component';
+import { ScannerComponent } from './Scanner/Scanner.component';
 
 const routes: Routes = [
   { path: '', component: OrganizerDashboardComponent },
   { path: 'events/new', component: EventFormComponent },
   { path: 'events/:id/edit', component: EventFormComponent },
-  { path: 'events/:id/attendees', component: AttendeesComponent }
+  { path: 'events/:id/attendees', component: AttendeesComponent },
+  { path: 'scanner', component: ScannerComponent }  // Scanner route for QR code verification
 ];
 
 @NgModule({
-  declarations: [OrganizerDashboardComponent, EventFormComponent, AttendeesComponent],
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule.forChild(routes)]
+  declarations: [
+    OrganizerDashboardComponent, 
+    EventFormComponent, 
+    AttendeesComponent,
+    ScannerComponent  // Add ScannerComponent to declarations
+  ],
+  imports: [
+    CommonModule, 
+    ReactiveFormsModule, 
+    FormsModule, 
+    RouterModule.forChild(routes)
+  ]
 })
 export class OrganizerModule {}

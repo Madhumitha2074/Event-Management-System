@@ -31,15 +31,17 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     // Subscribe to popup visibility from service
+    // This allows the navbar to trigger the popup
     this.locationPopupService.showPopup$.subscribe(show => {
       this.showLocationPopup = show;
     });
 
-    // Check when user logs in
+    // Check when user logs in - show popup only if no city selected
     this.authService.currentUser$.subscribe(user => {
       if (user) {
         const selectedCity = this.authService.getSelectedCity();
         if (!selectedCity) {
+          // Show popup after a short delay for better UX
           setTimeout(() => {
             this.locationPopupService.show();
           }, 500);
@@ -49,16 +51,18 @@ export class AppComponent implements OnInit {
   }
 
   onCitySelected(city: string): void {
+    // Save the selected city
     this.authService.setSelectedCity(city);
+    
+    // Hide the popup
     this.locationPopupService.hide();
     
-    // Navigate to events page with city filter
-    this.router.navigate(['/events'], { 
-      queryParams: { city: city } 
-    });
+    // Navigate to events page to show filtered events
+    this.router.navigate(['/events']);
   }
 
   onLocationPopupClosed(): void {
+    // Just hide the popup without saving
     this.locationPopupService.hide();
   }
 }

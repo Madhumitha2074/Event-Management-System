@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Output, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -20,6 +20,17 @@ import { FormsModule } from '@angular/forms';
         <div class="modal-body">
           <p class="text-muted mb-3">Find events happening near you in Tamil Nadu!</p>
           
+          <!-- Current selected city display -->
+          <div class="selected-city-info mb-3" *ngIf="currentSelectedCity">
+            <div class="alert alert-success alert-sm">
+              <i class="fas fa-check-circle me-2"></i>
+              Currently selected: <strong>{{ currentSelectedCity }}</strong>
+              <button class="btn btn-link btn-sm p-0 ms-2" (click)="clearAndReopen()">
+                Change
+              </button>
+            </div>
+          </div>
+          
           <!-- Search input with dropdown -->
           <div class="search-box mb-3">
             <i class="fas fa-search search-icon"></i>
@@ -38,8 +49,12 @@ import { FormsModule } from '@angular/forms';
               <div 
                 *ngFor="let city of filteredCities" 
                 class="dropdown-item"
+                [class.active-city]="city === currentSelectedCity"
                 (click)="selectCity(city)">
+                <i class="fas fa-map-marker-alt me-2 text-primary" *ngIf="city === currentSelectedCity"></i>
+                <i class="fas fa-map-marker-alt me-2 text-muted" *ngIf="city !== currentSelectedCity"></i>
                 {{ city }}
+                <span *ngIf="city === currentSelectedCity" class="badge bg-success ms-2">Selected</span>
               </div>
             </div>
           </div>
@@ -60,9 +75,11 @@ import { FormsModule } from '@angular/forms';
               <button 
                 *ngFor="let city of popularCities" 
                 class="city-btn"
+                [class.city-btn-active]="city === currentSelectedCity"
                 (click)="selectCity(city)"
               >
                 {{ city }}
+                <span *ngIf="city === currentSelectedCity" class="check-mark">✓</span>
               </button>
             </div>
           </div>
@@ -77,9 +94,11 @@ import { FormsModule } from '@angular/forms';
               <button 
                 *ngFor="let city of recentCities" 
                 class="city-btn-recent"
+                [class.city-btn-active]="city === currentSelectedCity"
                 (click)="selectCity(city)"
               >
                 {{ city }}
+                <span *ngIf="city === currentSelectedCity" class="check-mark">✓</span>
               </button>
             </div>
           </div>
@@ -153,6 +172,17 @@ import { FormsModule } from '@angular/forms';
       max-height: 65vh;
       overflow-y: auto;
     }
+    .selected-city-info {
+      margin-bottom: 16px;
+    }
+    .alert-success {
+      background-color: #d4edda;
+      border-color: #c3e6cb;
+      color: #155724;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
     .search-box {
       position: relative;
     }
@@ -201,12 +231,19 @@ import { FormsModule } from '@angular/forms';
       border-bottom: 1px solid #f0f0f0;
       font-size: 14px;
       color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
     .dropdown-item:last-child {
       border-bottom: none;
     }
     .dropdown-item:hover {
       background: #f8f9fa;
+    }
+    .dropdown-item.active-city {
+      background: #e8f0fe;
+      border-left: 3px solid #6c5ce7;
     }
     .btn-location {
       background: linear-gradient(135deg, #6c5ce7, #a29bfe);
@@ -240,15 +277,26 @@ import { FormsModule } from '@angular/forms';
       transition: all 0.2s;
       cursor: pointer;
       text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     .city-btn:hover {
       background: #6c5ce7;
       color: white;
       border-color: #6c5ce7;
       transform: translateY(-2px);
+    }
+    .city-btn-active {
+      background: #6c5ce7;
+      color: white;
+      border-color: #6c5ce7;
+    }
+    .check-mark {
+      font-size: 12px;
+      font-weight: bold;
     }
     .recent-grid {
       display: flex;
@@ -266,6 +314,9 @@ import { FormsModule } from '@angular/forms';
       transition: all 0.2s;
       cursor: pointer;
       text-align: center;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .city-btn-recent:hover {
       background: #6c5ce7;
@@ -332,6 +383,7 @@ export class LocationSelectorComponent {
   
   searchTerm = '';
   showDropdown = false;
+  currentSelectedCity: string | null = null;
   
   // Popular cities for quick selection (only 8)
   popularCities: string[] = [
@@ -391,6 +443,8 @@ export class LocationSelectorComponent {
     if (stored) {
       this.recentCities = JSON.parse(stored).slice(0, 3);
     }
+    // Get currently selected city from localStorage
+    this.currentSelectedCity = localStorage.getItem('selected_city');
   }
   
   filterCities(): void {
@@ -398,7 +452,6 @@ export class LocationSelectorComponent {
       this.filteredCities = [];
       this.showDropdown = false;
     } else {
-      // FIXED: Search from BEGINNING of city name only (prefix match)
       const searchLower = this.searchTerm.toLowerCase();
       this.filteredCities = this.allCities.filter(city => 
         city.toLowerCase().startsWith(searchLower)
@@ -451,9 +504,28 @@ export class LocationSelectorComponent {
       });
   }
   
+  // Updated selectCity method - saves to localStorage and emits
   selectCity(city: string): void {
+    // Add to recent cities
     this.addToRecentCities(city);
+    
+    // Update current selected city
+    this.currentSelectedCity = city;
+    
+    // Save to localStorage
+    localStorage.setItem('selected_city', city);
+    
+    // Emit the selected city to parent component
     this.citySelected.emit(city);
+  }
+  
+  clearAndReopen(): void {
+    // Clear the selected city
+    this.currentSelectedCity = null;
+    localStorage.removeItem('selected_city');
+    // Refresh the view
+    this.searchTerm = '';
+    this.filteredCities = [];
   }
   
   addToRecentCities(city: string): void {

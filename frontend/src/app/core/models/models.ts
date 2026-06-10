@@ -52,6 +52,7 @@ export interface Event {
   createdAt: string;
   seatConfig?: string; 
   hasSeatMap?: boolean;
+  googleMapsUrl?: string;
 }
 
 export interface EventFilter {

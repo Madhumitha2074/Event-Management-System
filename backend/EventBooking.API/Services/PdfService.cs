@@ -2,6 +2,7 @@ using EventBooking.API.DTOs;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using QuestPDFColor = QuestPDF.Infrastructure.Color;
 
 namespace EventBooking.API.Services
 {
@@ -39,7 +40,7 @@ namespace EventBooking.API.Services
                         {
                             // Top colour bar
                             col.Item()
-                               .Background(Color.FromHex("#6c5ce7"))
+                               .Background(QuestPDFColor.FromHex("#6c5ce7"))
                                .Padding(18)
                                .Row(row =>
                                {
@@ -47,19 +48,19 @@ namespace EventBooking.API.Services
                                       .Text("🎫  EventBook")
                                       .FontSize(22)
                                       .Bold()
-                                      .FontColor(Colors.White);
+                                      .FontColor(QuestPDFColor.FromHex("#ffffff"));
 
                                    row.ConstantItem(160)
                                       .AlignRight()
                                       .Text("BOOKING CONFIRMATION")
                                       .FontSize(10)
                                       .Bold()
-                                      .FontColor(Color.FromHex("#a29bfe"));
+                                      .FontColor(QuestPDFColor.FromHex("#a29bfe"));
                                });
 
                             // Booking reference banner
                             col.Item()
-                               .Background(Color.FromHex("#f0eeff"))
+                               .Background(QuestPDFColor.FromHex("#f0eeff"))
                                .Padding(10)
                                .Row(row =>
                                {
@@ -68,11 +69,11 @@ namespace EventBooking.API.Services
                                       {
                                           text.Span("Booking Reference:  ")
                                               .FontSize(11)
-                                              .FontColor(Colors.Grey.Darken2);
+                                              .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
                                           text.Span(booking.BookingReference)
                                               .FontSize(14)
                                               .Bold()
-                                              .FontColor(Color.FromHex("#6c5ce7"));
+                                              .FontColor(QuestPDFColor.FromHex("#6c5ce7"));
                                       });
 
                                    row.ConstantItem(120)
@@ -80,13 +81,13 @@ namespace EventBooking.API.Services
                                       .Text(text =>
                                       {
                                           text.Span("Status:  ")
-                                              .FontColor(Colors.Grey.Darken2);
+                                              .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
                                           text.Span(booking.Status)
                                               .Bold()
                                               .FontColor(
                                                   booking.Status == "Confirmed"
-                                                      ? Color.FromHex("#00b894")
-                                                      : Color.FromHex("#d63031")
+                                                      ? QuestPDFColor.FromHex("#00b894")
+                                                      : QuestPDFColor.FromHex("#d63031")
                                               );
                                       });
                                });
@@ -106,11 +107,11 @@ namespace EventBooking.API.Services
                                .Text("Event Details")
                                .FontSize(13)
                                .Bold()
-                               .FontColor(Color.FromHex("#6c5ce7"));
+                               .FontColor(QuestPDFColor.FromHex("#6c5ce7"));
 
                             col.Item()
                                .Border(1)
-                               .BorderColor(Color.FromHex("#dee2e6"))
+                               .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                                .Table(table =>
                                {
                                    table.ColumnsDefinition(cols =>
@@ -123,25 +124,25 @@ namespace EventBooking.API.Services
                                    void AddRow(string label, string value, bool shaded = false)
                                    {
                                        var bg = shaded
-                                           ? Color.FromHex("#f8f9fa")
-                                           : Colors.White;
+                                           ? QuestPDFColor.FromHex("#f8f9fa")
+                                           : QuestPDFColor.FromHex("#ffffff");
 
                                        table.Cell()
                                             .Background(bg)
                                             .BorderBottom(1)
-                                            .BorderColor(Color.FromHex("#dee2e6"))
+                                            .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                                             .Padding(9)
                                             .Text(label)
                                             .Bold()
-                                            .FontColor(Colors.Grey.Darken2);
+                                            .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
 
                                        table.Cell()
                                             .Background(bg)
                                             .BorderBottom(1)
-                                            .BorderColor(Color.FromHex("#dee2e6"))
+                                            .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                                             .Padding(9)
                                             .Text(value)
-                                            .FontColor(Color.FromHex("#2d3436"));
+                                            .FontColor(QuestPDFColor.FromHex("#2d3436"));
                                    }
 
                                    AddRow("Event",    booking.EventTitle,  shaded: true);
@@ -160,11 +161,11 @@ namespace EventBooking.API.Services
                                .Text("Payment Summary")
                                .FontSize(13)
                                .Bold()
-                               .FontColor(Color.FromHex("#6c5ce7"));
+                               .FontColor(QuestPDFColor.FromHex("#6c5ce7"));
 
                             col.Item()
                                .Border(1)
-                               .BorderColor(Color.FromHex("#dee2e6"))
+                               .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                                .Table(table =>
                                {
                                    table.ColumnsDefinition(cols =>
@@ -174,115 +175,175 @@ namespace EventBooking.API.Services
                                    });
 
                                    table.Cell()
-                                        .Background(Color.FromHex("#f8f9fa"))
+                                        .Background(QuestPDFColor.FromHex("#f8f9fa"))
                                         .BorderBottom(1)
-                                        .BorderColor(Color.FromHex("#dee2e6"))
+                                        .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                                         .Padding(9)
                                         .Text("Tickets")
                                         .Bold()
-                                        .FontColor(Colors.Grey.Darken2);
+                                        .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
 
                                    table.Cell()
-                                        .Background(Color.FromHex("#f8f9fa"))
+                                        .Background(QuestPDFColor.FromHex("#f8f9fa"))
                                         .BorderBottom(1)
-                                        .BorderColor(Color.FromHex("#dee2e6"))
+                                        .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                                         .Padding(9)
                                         .Text($"{booking.TicketCount} ticket(s)")
-                                        .FontColor(Color.FromHex("#2d3436"));
+                                        .FontColor(QuestPDFColor.FromHex("#2d3436"));
 
                                    table.Cell()
                                         .Padding(9)
                                         .Text("Total Amount")
                                         .Bold()
-                                        .FontColor(Colors.Grey.Darken2);
+                                        .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
 
-                                   // ✅ Formatted with decimal places
                                    table.Cell()
                                         .Padding(9)
                                         .Text($"₹{booking.TotalAmount:N2}")
                                         .Bold()
                                         .FontSize(14)
-                                        .FontColor(Color.FromHex("#00b894"));
+                                        .FontColor(QuestPDFColor.FromHex("#00b894"));
                                });
 
-                            // ── Attendees / Tickets Section ─────────────
+                            // ── Attendees / Tickets Section with QR Codes ─────────────
                             if (booking.Tickets != null && booking.Tickets.Count > 0)
                             {
                                 col.Item()
-                                   .Text("Ticket Holders")
+                                   .Text("E-Tickets with QR Codes")
                                    .FontSize(13)
                                    .Bold()
-                                   .FontColor(Color.FromHex("#6c5ce7"));
+                                   .FontColor(QuestPDFColor.FromHex("#6c5ce7"));
 
-                                col.Item()
-                                   .Border(1)
-                                   .BorderColor(Color.FromHex("#dee2e6"))
-                                   .Table(table =>
-                                   {
-                                       table.ColumnsDefinition(cols =>
+                                // Create a table for each ticket
+                                for (int i = 0; i < booking.Tickets.Count; i++)
+                                {
+                                    var ticket = booking.Tickets[i];
+                                    bool isEven = i % 2 == 0;
+                                    int ticketIndex = i;
+
+                                    col.Item()
+                                       .Border(1)
+                                       .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
+                                       .Background(isEven ? QuestPDFColor.FromHex("#f8f9fa") : QuestPDFColor.FromHex("#ffffff"))
+                                       .Padding(12)
+                                       .Row(row =>
                                        {
-                                           cols.ConstantColumn(30);   // #
-                                           cols.RelativeColumn(2);    // Name
-                                           cols.RelativeColumn(3);    // Email
-                                           cols.RelativeColumn(2);    // Ticket No.
+                                           // QR Code column
+                                           row.ConstantItem(100)
+                                              .AlignCenter()
+                                              .Column(qrCol =>
+                                              {
+                                                  if (!string.IsNullOrEmpty(ticket.QrCodeBase64))
+                                                  {
+                                                      try
+                                                      {
+                                                          var qrBytes = Convert.FromBase64String(ticket.QrCodeBase64);
+                                                          qrCol.Item()
+                                                               .Width(80)
+                                                               .Height(80)
+                                                               .Image(qrBytes);
+                                                      }
+                                                      catch
+                                                      {
+                                                          qrCol.Item().Text("[QR Code]").FontSize(10).FontColor(QuestPDFColor.FromHex("#6c6f7e"));
+                                                      }
+                                                  }
+                                                  else
+                                                  {
+                                                      qrCol.Item().Text("No QR").FontSize(10).FontColor(QuestPDFColor.FromHex("#6c6f7e"));
+                                                  }
+                                              });
+
+                                           // Ticket details column
+                                           row.RelativeItem()
+                                              .Column(detailCol =>
+                                              {
+                                                  detailCol.Item()
+                                                         .Text(text =>
+                                                         {
+                                                             text.Span($"Ticket #{ticketIndex + 1}: ").FontSize(11).Bold();
+                                                             text.Span(ticket.TicketNumber).FontSize(10).FontColor(QuestPDFColor.FromHex("#6c6f7e"));
+                                                         });
+
+                                                  detailCol.Item()
+                                                         .Text(text =>
+                                                         {
+                                                             text.Span("Attendee: ").FontSize(10).Bold();
+                                                             text.Span(ticket.AttendeeName).FontSize(10);
+                                                         });
+
+                                                  detailCol.Item()
+                                                         .Text(text =>
+                                                         {
+                                                             text.Span("Email: ").FontSize(10).Bold();
+                                                             text.Span(ticket.AttendeeEmail).FontSize(10);
+                                                         });
+
+                                                  if (!string.IsNullOrEmpty(ticket.SeatNumber))
+                                                  {
+                                                      detailCol.Item()
+                                                             .Text(text =>
+                                                             {
+                                                                 text.Span("Seat: ").FontSize(10).Bold();
+                                                                 text.Span($"{ticket.SeatNumber} ({ticket.Tier})").FontSize(10);
+                                                                 if (ticket.SeatPrice.HasValue)
+                                                                 {
+                                                                     text.Span($" - ₹{ticket.SeatPrice.Value}").FontSize(10);
+                                                                 }
+                                                             });
+                                                  }
+
+                                                  // Status badge (without BorderRadius)
+                                                  detailCol.Item()
+                                                         .PaddingTop(5)
+                                                         .Element(container =>
+                                                         {
+                                                             container.Background(ticket.IsUsed ? QuestPDFColor.FromHex("#dc3545") : QuestPDFColor.FromHex("#28a745"))
+                                                                     .PaddingVertical(2)
+                                                                     .PaddingHorizontal(8)
+                                                                     .Width(60)
+                                                                     .AlignCenter()
+                                                                     .Text(ticket.IsUsed ? "USED" : "VALID")
+                                                                     .FontSize(8)
+                                                                     .Bold()
+                                                                     .FontColor(QuestPDFColor.FromHex("#ffffff"));
+                                                         });
+                                              });
                                        });
-
-                                       // ── Table header ──────────────────
-                                       void HeaderCell(string text)
-                                       {
-                                           table.Cell()
-                                                .Background(Color.FromHex("#6c5ce7"))
-                                                .Padding(8)
-                                                .Text(text)
-                                                .Bold()
-                                                .FontColor(Colors.White);
-                                       }
-
-                                       HeaderCell("#");
-                                       HeaderCell("Name");
-                                       HeaderCell("Email");
-                                       HeaderCell("Ticket No.");
-
-                                       // ── Table rows ────────────────────
-                                       for (int i = 0; i < booking.Tickets.Count; i++)
-                                       {
-                                           var ticket = booking.Tickets[i];
-                                           bool shaded = i % 2 == 0;
-                                           var  bg     = shaded
-                                               ? Color.FromHex("#f8f9fa")
-                                               : Colors.White;
-
-                                           void DataCell(string value)
-                                           {
-                                               table.Cell()
-                                                    .Background(bg)
-                                                    .BorderBottom(1)
-                                                    .BorderColor(Color.FromHex("#dee2e6"))
-                                                    .Padding(8)
-                                                    .Text(value)
-                                                    .FontColor(Color.FromHex("#2d3436"));
-                                           }
-
-                                           DataCell((i + 1).ToString());
-                                           DataCell(ticket.AttendeeName);
-                                           DataCell(ticket.AttendeeEmail);
-                                           DataCell(ticket.TicketNumber);
-                                       }
-                                   });
+                                    
+                                    // Add separator between tickets except after last
+                                    if (i < booking.Tickets.Count - 1)
+                                    {
+                                        col.Item().PaddingTop(8).PaddingBottom(8).Text("");
+                                    }
+                                }
                             }
 
                             // ── Notice ──────────────────────────────────
                             col.Item()
-                               .Background(Color.FromHex("#fff3cd"))
+                               .Background(QuestPDFColor.FromHex("#fff3cd"))
                                .Border(1)
-                               .BorderColor(Color.FromHex("#ffc107"))
+                               .BorderColor(QuestPDFColor.FromHex("#ffc107"))
                                .Padding(10)
-                               .Text(
-                                   "Please carry this confirmation and a valid ID to the event. " +
-                                   "Tickets are non-transferable."
-                               )
-                               .FontSize(10)
-                               .FontColor(Color.FromHex("#856404"));
+                               .Column(noticeCol =>
+                               {
+                                   noticeCol.Item()
+                                          .Text("📌 Important Instructions")
+                                          .FontSize(11)
+                                          .Bold()
+                                          .FontColor(QuestPDFColor.FromHex("#856404"));
+                                   
+                                   noticeCol.Item()
+                                          .PaddingTop(5)
+                                          .Text(
+                                              "• Please carry this confirmation and a valid ID to the event.\n" +
+                                              "• Each ticket has a unique QR code that will be scanned at the entrance.\n" +
+                                              "• Tickets are non-transferable.\n" +
+                                              "• Screenshots of QR codes are acceptable for entry."
+                                          )
+                                          .FontSize(9)
+                                          .FontColor(QuestPDFColor.FromHex("#856404"));
+                               });
                         });
 
                     // ─────────────────────────────────────────────
@@ -290,14 +351,14 @@ namespace EventBooking.API.Services
                     // ─────────────────────────────────────────────
                     page.Footer()
                         .BorderTop(1)
-                        .BorderColor(Color.FromHex("#dee2e6"))
+                        .BorderColor(QuestPDFColor.FromHex("#dee2e6"))
                         .PaddingTop(10)
                         .Row(row =>
                         {
                             row.RelativeItem()
                                .Text($"© {DateTime.UtcNow.Year} EventBook")
                                .FontSize(9)
-                               .FontColor(Colors.Grey.Medium);
+                               .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
 
                             row.ConstantItem(200)
                                .AlignRight()
@@ -305,16 +366,16 @@ namespace EventBooking.API.Services
                                {
                                    text.Span("Page ")
                                        .FontSize(9)
-                                       .FontColor(Colors.Grey.Medium);
+                                       .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
                                    text.CurrentPageNumber()
                                        .FontSize(9)
-                                       .FontColor(Colors.Grey.Medium);
+                                       .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
                                    text.Span(" of ")
                                        .FontSize(9)
-                                       .FontColor(Colors.Grey.Medium);
+                                       .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
                                    text.TotalPages()
                                        .FontSize(9)
-                                       .FontColor(Colors.Grey.Medium);
+                                       .FontColor(QuestPDFColor.FromHex("#6c6f7e"));
                                });
                         });
                 });
