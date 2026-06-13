@@ -10,11 +10,11 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // ─────────────────────────────────────────────────────
-// SERVICES
+// SERVICES - REGISTRATION
 // ─────────────────────────────────────────────────────
 
-builder.Services.AddSingleton<DatabaseHelper>();        // ✅ Singleton — holds connection string only
-builder.Services.AddSingleton<PdfService>();            // ✅ Singleton — stateless, no dependencies
+builder.Services.AddSingleton<DatabaseHelper>();     //AddSingleton - Creates ONE instance that lives for the entire application lifetime   
+builder.Services.AddSingleton<PdfService>();            
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEventService, EventService>();
@@ -23,7 +23,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ISeatService, SeatService>();
 builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 
-// ✅ camelCase JSON output — matches Angular model property names
+//  camelCase JSON output — matches Angular model property names
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -56,7 +56,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
 
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero    // ✅ No grace period on token expiry
+            ClockSkew = TimeSpan.Zero    //  No grace period on token expiry
         };
     });
 
@@ -166,13 +166,13 @@ app.UseExceptionHandler(appError =>
 // MIDDLEWARE PIPELINE  (order matters)
 // ─────────────────────────────────────────────────────
 
-// ✅ HTTPS redirection
+//  HTTPS redirection
 //app.UseHttpsRedirection();
 
-// ✅ CORS before everything else that serves content
+//  CORS before everything else that serves content
 app.UseCors("AllowAngular");
 
-// ✅ Swagger only in Development — not exposed in Production
+//  Swagger only in Development — not exposed in Production
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

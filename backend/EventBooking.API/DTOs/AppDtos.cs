@@ -44,6 +44,7 @@ namespace EventBooking.API.DTOs
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public int UserId { get; set; }
+        public bool AutoLogin { get; set; } = false;  // ← Add this property
     }
 
     public class UserProfileDto

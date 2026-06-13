@@ -576,7 +576,7 @@ namespace EventBooking.API.Services
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            // ✅ Verify organizer owns the event before returning data
+            //  Verify organizer owns the event before returning data
             string ownerCheck = @"
                 SELECT COUNT(1) FROM Events
                 WHERE Id = @EventId AND OrganizerId = @OrganizerId";

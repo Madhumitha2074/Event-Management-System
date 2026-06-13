@@ -23,7 +23,7 @@ import { LocationSelectorComponent } from './shared/location-selector/location-s
     BrowserAnimationsModule,
     HttpClientModule,
     AppRoutingModule,
-    LocationSelectorComponent, // ✅ Standalone component goes in imports
+    LocationSelectorComponent, //  Standalone component goes in imports
     ToastrModule.forRoot({ positionClass: 'toast-top-right', timeOut: 3000 })
   ],
   providers: [

@@ -1,0 +1,232 @@
+<!-- register.component.html -->
+<div class="min-vh-100 d-flex align-items-center" style="background: linear-gradient(135deg,#6c5ce7,#fd79a8);">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-5">
+        <div class="card shadow-lg border-0 rounded-4">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              <i class="fas fa-user-plus fa-3x text-primary"></i>
+              <h3 class="fw-bold mt-2">Create Account</h3>
+              <p class="text-muted">Join our event community</p>
+            </div>
+
+            <!-- Password Mismatch Specific Alert -->
+            <div class="alert alert-warning" role="alert" *ngIf="submitted && form.hasError('passwordMismatch')">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <strong>Password Mismatch!</strong>
+              <p class="mb-0 mt-1">The passwords you entered do not match. Please re-enter your password correctly.</p>
+            </div>
+
+            <!-- Weak Password Alert - Fixed @ symbol -->
+            <div class="alert alert-danger" role="alert" *ngIf="submitted && !isPasswordStrong() && form.get('password')?.value">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <strong>Weak Password!</strong>
+              <p class="mb-0 mt-1">Please make your password stronger by including uppercase, lowercase, number, and special character (!&#64;#$%^&amp;*).</p>
+            </div>
+
+            <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+              <!-- Full Name -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Full Name *</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  formControlName="name" 
+                  [class.is-invalid]="submitted && f['name'].invalid"
+                  placeholder="John Doe">
+                <div class="invalid-feedback" *ngIf="submitted && f['name'].invalid">
+                  <div *ngIf="f['name'].errors?.['required']">Full name is required</div>
+                  <div *ngIf="f['name'].errors?.['minlength']">Name must be at least 3 characters</div>
+                  <div *ngIf="f['name'].errors?.['pattern']">Name can only contain letters and spaces</div>
+                </div>
+              </div>
+
+              <!-- Email -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Email Address *</label>
+                <input 
+                  type="email" 
+                  class="form-control" 
+                  formControlName="email" 
+                  [class.is-invalid]="submitted && f['email'].invalid"
+                  [class.is-valid]="f['email'].valid && f['email'].dirty"
+                  placeholder="your@email.com">
+                <div class="invalid-feedback" *ngIf="submitted && f['email'].invalid">
+                  <div *ngIf="f['email'].errors?.['required']">Email is required</div>
+                  <div *ngIf="f['email'].errors?.['email']">Please enter a valid email address</div>
+                  <div *ngIf="f['email'].errors?.['pattern']">Email format is invalid</div>
+                </div>
+                <div class="valid-feedback" *ngIf="f['email'].valid && f['email'].dirty">
+                  ✓ Valid email address
+                </div>
+              </div>
+
+              <!-- Phone Number -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Phone Number</label>
+                <input 
+                  type="tel" 
+                  class="form-control" 
+                  formControlName="phoneNumber" 
+                  [class.is-invalid]="submitted && f['phoneNumber'].invalid && f['phoneNumber'].dirty"
+                  placeholder="+1 234 567 8900">
+                <div class="invalid-feedback" *ngIf="submitted && f['phoneNumber'].invalid && f['phoneNumber'].dirty">
+                  <div *ngIf="f['phoneNumber'].errors?.['pattern']">Enter a valid phone number (10-15 digits)</div>
+                </div>
+                <small class="text-muted">Optional but recommended for event updates</small>
+              </div>
+
+              <!-- Password Section -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Password *</label>
+                <div class="input-group">
+                  <input 
+                    [type]="showPassword ? 'text' : 'password'" 
+                    class="form-control" 
+                    formControlName="password" 
+                    [class.is-invalid]="submitted && f['password'].invalid"
+                    placeholder="Min 8 characters with uppercase, lowercase, number & special character">
+                  <button 
+                    class="btn btn-outline-secondary" 
+                    type="button"
+                    (click)="togglePasswordVisibility('password')">
+                    <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                  </button>
+                </div>
+                
+                <!-- Password Requirements Checklist - Fixed @ symbol -->
+                <div class="password-requirements mt-2" *ngIf="f['password'].value && !isPasswordStrong()">
+                  <small class="text-muted d-block mb-1">Password must contain:</small>
+                  <div class="requirement" [class.valid]="getPasswordRequirements().minLength">
+                    <i class="fas" [class.fa-check-circle]="getPasswordRequirements().minLength" [class.fa-circle]="!getPasswordRequirements().minLength"></i>
+                    At least 8 characters
+                  </div>
+                  <div class="requirement" [class.valid]="getPasswordRequirements().hasUpperCase">
+                    <i class="fas" [class.fa-check-circle]="getPasswordRequirements().hasUpperCase" [class.fa-circle]="!getPasswordRequirements().hasUpperCase"></i>
+                    One uppercase letter (A-Z)
+                  </div>
+                  <div class="requirement" [class.valid]="getPasswordRequirements().hasLowerCase">
+                    <i class="fas" [class.fa-check-circle]="getPasswordRequirements().hasLowerCase" [class.fa-circle]="!getPasswordRequirements().hasLowerCase"></i>
+                    One lowercase letter (a-z)
+                  </div>
+                  <div class="requirement" [class.valid]="getPasswordRequirements().hasNumber">
+                    <i class="fas" [class.fa-check-circle]="getPasswordRequirements().hasNumber" [class.fa-circle]="!getPasswordRequirements().hasNumber"></i>
+                    One number (0-9)
+                  </div>
+                  <div class="requirement" [class.valid]="getPasswordRequirements().hasSpecialChar">
+                    <i class="fas" [class.fa-check-circle]="getPasswordRequirements().hasSpecialChar" [class.fa-circle]="!getPasswordRequirements().hasSpecialChar"></i>
+                    One special character (!&#64;#$%^&amp;*)
+                  </div>
+                </div>
+                
+                <div class="invalid-feedback" *ngIf="submitted && f['password'].invalid">
+                  <div *ngIf="f['password'].errors?.['required']">Password is required</div>
+                  <div *ngIf="f['password'].errors?.['minlength']">Password must be at least 8 characters</div>
+                  <div *ngIf="f['password'].errors?.['strongPassword']">
+                    Password must contain uppercase, lowercase, number, and special character (!&#64;#$%^&amp;*)
+                  </div>
+                </div>
+                
+                <!-- Password Strength Indicator -->
+                <div class="mt-2" *ngIf="f['password'].value && f['password'].dirty">
+                  <div class="d-flex justify-content-between mb-1">
+                    <small class="text-muted">Password strength:</small>
+                    <small [class.text-danger]="passwordStrength === 'Weak'"
+                           [class.text-warning]="passwordStrength === 'Medium'"
+                           [class.text-success]="passwordStrength === 'Strong'">
+                      {{ passwordStrength }}
+                    </small>
+                  </div>
+                  <div class="progress" style="height: 4px;">
+                    <div class="progress-bar" 
+                         [class.bg-danger]="passwordStrength === 'Weak'"
+                         [class.bg-warning]="passwordStrength === 'Medium'"
+                         [class.bg-success]="passwordStrength === 'Strong'"
+                         [style.width]="getPasswordStrengthWidth()">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Confirm Password -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Confirm Password *</label>
+                <div class="input-group">
+                  <input 
+                    [type]="showConfirmPassword ? 'text' : 'password'" 
+                    class="form-control" 
+                    formControlName="confirmPassword" 
+                    [class.is-invalid]="submitted && (f['confirmPassword'].invalid || form.errors?.['passwordMismatch'])"
+                    placeholder="Confirm your password">
+                  <button 
+                    class="btn btn-outline-secondary" 
+                    type="button"
+                    (click)="togglePasswordVisibility('confirm')">
+                    <i [class]="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                  </button>
+                </div>
+                
+                <div class="invalid-feedback d-block" *ngIf="submitted && form.errors?.['passwordMismatch']">
+                  <i class="fas fa-times-circle me-1"></i>
+                  <strong>Passwords do not match!</strong> The password you entered does not match the confirmation password.
+                </div>
+                <div class="valid-feedback" *ngIf="f['confirmPassword'].valid && !form.errors?.['passwordMismatch'] && f['confirmPassword'].dirty">
+                  ✓ Passwords match
+                </div>
+              </div>
+
+              <!-- Role Selection -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">I want to *</label>
+                <select class="form-select" formControlName="role" [class.is-invalid]="submitted && f['role'].invalid">
+                  <option [value]="0">🎉 Browse & Book Events</option>
+                  <option [value]="1">🎪 Organize Events</option>
+                </select>
+                <div class="invalid-feedback" *ngIf="submitted && f['role'].invalid">
+                  Please select your preference
+                </div>
+              </div>
+
+              <!-- Terms and Conditions -->
+              <div class="mb-3 form-check">
+                <input 
+                  type="checkbox" 
+                  class="form-check-input" 
+                  id="terms" 
+                  formControlName="acceptTerms"
+                  [class.is-invalid]="submitted && f['acceptTerms'].invalid">
+                <label class="form-check-label" for="terms">
+                  I agree to the Terms and Conditions *
+                </label>
+                <div class="invalid-feedback" *ngIf="submitted && f['acceptTerms'].invalid">
+                  You must accept terms and conditions
+                </div>
+              </div>
+
+              <!-- Submit Button -->
+              <button class="btn btn-primary w-100 py-2 mt-2" type="submit" [disabled]="loading || form.pending || (f['password'].value && !isPasswordStrong())">
+                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+                <i *ngIf="!loading" class="fas fa-user-plus me-2"></i>
+                {{ loading ? 'Creating Account...' : 'Create Account' }}
+              </button>
+              
+              <div class="text-center mt-2" *ngIf="f['password'].value && !isPasswordStrong()">
+                <small class="text-danger">
+                  <i class="fas fa-info-circle"></i> Please meet all password requirements to register
+                </small>
+              </div>
+            </form>
+
+            <!-- Login Link -->
+            <div class="text-center mt-4">
+              <p class="mb-0">Already have an account? 
+                <a routerLink="/auth/login" class="text-decoration-none fw-bold">Sign In</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

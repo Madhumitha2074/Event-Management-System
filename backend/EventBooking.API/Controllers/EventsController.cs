@@ -14,7 +14,7 @@ namespace EventBooking.API.Controllers
         private readonly IBookingService _bookingService;
         private readonly ISeatService _seatService;
 
-        // ✅ Both services injected via constructor — consistent and testable
+        //  Both services injected via constructor — consistent and testable
         public EventsController(IEventService eventService, IBookingService bookingService, ISeatService seatService)
         {
             _eventService = eventService;
@@ -66,7 +66,7 @@ namespace EventBooking.API.Controllers
         // POST api/events  (Organizer or Admin only)
         // ─────────────────────────────────────────────
         [HttpPost]
-        [Authorize(Roles = "Organizer,Admin")]   // ✅ Admin can also create events
+        [Authorize(Roles = "Organizer,Admin")]   // Admin can also create events
         public async Task<IActionResult> CreateEvent([FromBody] CreateEventDto dto)
         {
             if (!TryGetUserId(out int organizerId))
@@ -113,7 +113,7 @@ namespace EventBooking.API.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                // ✅ Forbid() doesn't accept a message — use StatusCode 403 instead
+                //  Forbid() doesn't accept a message — use StatusCode 403 instead
                 return StatusCode(403, new { message = ex.Message });
             }
             catch (Exception ex)
@@ -144,7 +144,7 @@ namespace EventBooking.API.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                // ✅ Correct 403 with message
+                //  Correct 403 with message
                 return StatusCode(403, new { message = ex.Message });
             }
             catch (Exception ex)
@@ -181,7 +181,7 @@ namespace EventBooking.API.Controllers
         [Authorize(Roles = "Organizer,Admin")]
         public async Task<IActionResult> GetAttendees(int id)
         {
-            // ✅ No longer [FromServices] — uses constructor-injected _bookingService
+            //  No longer [FromServices] — uses constructor-injected _bookingService
             if (!TryGetUserId(out int organizerId))
                 return Unauthorized(new { message = "Invalid token." });
 
@@ -204,21 +204,6 @@ namespace EventBooking.API.Controllers
             }
         }
 
-        // GET api/events/{id}/seats
-        //[HttpGet("{id}/seats")]
-        //[AllowAnonymous]
-        //public async Task<IActionResult> GetEventSeats(int id)
-        //{
-           // try
-           // {
-              //  var seats = await _seatService.GetSeatsAsync(id);
-               // return Ok(seats);
-            //}
-           // catch (Exception ex)
-           // {
-               // return StatusCode(500, new { message = "Failed to load seats.", detail = ex.Message });
-           // }
-        //}
 
         // ─────────────────────────────────────────────
         // PRIVATE: Safe user ID extraction from JWT

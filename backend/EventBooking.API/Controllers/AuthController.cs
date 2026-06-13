@@ -23,7 +23,7 @@ namespace EventBooking.API.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
-            // ✅ [ApiController] automatically returns 400 if model annotations fail
+            // [ApiController] automatically returns 400 if model annotations fail
             // This catch handles business logic errors from the service
             try
             {
@@ -72,7 +72,7 @@ namespace EventBooking.API.Controllers
         {
             try
             {
-                // ✅ Safe parse — handle malformed token claim gracefully
+                // Safe parse — handle malformed token claim gracefully
                 var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
                 if (string.IsNullOrWhiteSpace(userIdClaim) || !int.TryParse(userIdClaim, out int userId))

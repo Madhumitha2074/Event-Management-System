@@ -1,0 +1,36 @@
+// Add to register.component.scss
+.password-requirements {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  
+  .requirement {
+    color: #dc3545;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    i {
+      font-size: 10px;
+      width: 14px;
+    }
+    
+    &.valid {
+      color: #28a745;
+    }
+  }
+}
+
+// Disabled button style
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+// Alert styles
+.alert {
+  border-radius: 8px;
+  margin-bottom: 20px;
+}

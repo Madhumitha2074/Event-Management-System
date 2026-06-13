@@ -1,10 +1,12 @@
 export interface User {
-  id: number;
-  name: string;
+  id: string;
   email: string;
-  phone?: string;
+  name: string;
+  fullName?: string;
   role: string;
-  createdAt: string;
+  phoneNumber?: string;
+  createdAt?: string;
+  userId?: string;
 }
 
 export interface AuthResponse {
@@ -13,14 +15,18 @@ export interface AuthResponse {
   email: string;
   role: string;
   userId: number;
+  autoLogin?: boolean;  // ← Add this optional property
 }
 
+// src/app/core/models/models.ts
 export interface RegisterRequest {
-  name: string;
+  name: string;        // Change from fullName to name
   email: string;
+  phoneNumber?: string;
   password: string;
-  phone?: string;
-  role: number;
+  role: string;        // Change from userType to role
+  acceptedTerms: boolean;
+  acceptedTermsAt?: string;
 }
 
 export interface LoginRequest {
