@@ -17,9 +17,7 @@ export class AuthService {
 
   constructor(private http: HttpClient, private router: Router) {}
 
-  // UPDATED register method with proper role handling
   register(data: any): Observable<AuthResponse> {
-    // Make sure role is a number (0 or 1)
     const payload = {
       name: data.name?.trim(),
       email: data.email?.toLowerCase()?.trim(),
@@ -27,6 +25,7 @@ export class AuthService {
       password: data.password,
       role: typeof data.role === 'number' ? data.role : (data.role === 'user' ? 0 : 1),
       acceptTerms: true,
+      phoneVerified: data.phoneVerified || false,
       acceptedTermsAt: new Date().toISOString()
     };
     
@@ -58,6 +57,24 @@ export class AuthService {
 
   checkEmailAvailability(email: string): Observable<boolean> {
     return this.http.get<boolean>(`${this.API}/check-email?email=${email}`).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // ============ OTP Methods for WhatsApp/SMS ============
+  
+  sendOTP(phoneNumber: string): Observable<any> {
+    console.log('Sending OTP to:', phoneNumber);
+    return this.http.post(`${this.API}/send-otp`, { phoneNumber }).pipe(
+      tap(res => console.log('OTP send response:', res)),
+      catchError(this.handleError)
+    );
+  }
+
+  verifyOTP(phoneNumber: string, otpCode: string): Observable<any> {
+    console.log('Verifying OTP for:', phoneNumber);
+    return this.http.post(`${this.API}/verify-otp`, { phoneNumber, otpCode }).pipe(
+      tap(res => console.log('OTP verify response:', res)),
       catchError(this.handleError)
     );
   }

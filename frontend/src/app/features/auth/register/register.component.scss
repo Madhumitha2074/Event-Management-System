@@ -34,3 +34,69 @@
   border-radius: 8px;
   margin-bottom: 20px;
 }
+
+// Add to existing register.component.scss
+.password-requirements {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  
+  .requirement {
+    color: #dc3545;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    i {
+      font-size: 10px;
+      width: 14px;
+    }
+    
+    &.valid {
+      color: #28a745;
+    }
+  }
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.alert {
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+// Phone input group styling
+.input-group-text {
+  background-color: #f8f9fa;
+}
+
+// OTP input styling
+input[type="tel"]:focus, input[type="text"]:focus {
+  box-shadow: none;
+}
+
+// Success alert styling
+.alert-success {
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+/* Add to register.component.scss */
+input[type="tel"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* For browsers that don't support oninput */
+input[type="tel"]:invalid {
+  border-color: #dc3545;
+}
+input::-ms-reveal {
+    display: none;
+}

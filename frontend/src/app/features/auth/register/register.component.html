@@ -11,14 +11,14 @@
               <p class="text-muted">Join our event community</p>
             </div>
 
-            <!-- Password Mismatch Specific Alert -->
+            <!-- Password Mismatch Alert -->
             <div class="alert alert-warning" role="alert" *ngIf="submitted && form.hasError('passwordMismatch')">
               <i class="fas fa-exclamation-triangle me-2"></i>
               <strong>Password Mismatch!</strong>
               <p class="mb-0 mt-1">The passwords you entered do not match. Please re-enter your password correctly.</p>
             </div>
 
-            <!-- Weak Password Alert - Fixed @ symbol -->
+            <!-- Weak Password Alert -->
             <div class="alert alert-danger" role="alert" *ngIf="submitted && !isPasswordStrong() && form.get('password')?.value">
               <i class="fas fa-exclamation-triangle me-2"></i>
               <strong>Weak Password!</strong>
@@ -26,76 +26,168 @@
             </div>
 
             <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-              <!-- Full Name -->
+              
+              <!-- Full Name Field -->
               <div class="mb-3">
                 <label class="form-label fw-semibold">Full Name *</label>
                 <input 
                   type="text" 
                   class="form-control" 
                   formControlName="name" 
-                  [class.is-invalid]="submitted && f['name'].invalid"
-                  placeholder="John Doe">
-                <div class="invalid-feedback" *ngIf="submitted && f['name'].invalid">
-                  <div *ngIf="f['name'].errors?.['required']">Full name is required</div>
-                  <div *ngIf="f['name'].errors?.['minlength']">Name must be at least 3 characters</div>
-                  <div *ngIf="f['name'].errors?.['pattern']">Name can only contain letters and spaces</div>
+                  [class.is-invalid]="shouldShowError('name')"
+                  placeholder="John Doe"
+                  (input)="clearFieldError('name')">
+                <div class="invalid-feedback" *ngIf="shouldShowError('name') && f['name'].errors?.['required']">
+                  Full name is required
+                </div>
+                <div class="invalid-feedback" *ngIf="shouldShowError('name') && f['name'].errors?.['minlength']">
+                  Name must be at least 3 characters
+                </div>
+                <div class="invalid-feedback" *ngIf="shouldShowError('name') && f['name'].errors?.['pattern']">
+                  Name can only contain letters and spaces
                 </div>
               </div>
 
-              <!-- Email -->
+              <!-- Contact Method Selection -->
               <div class="mb-3">
+                <label class="form-label fw-semibold">Contact Method *</label>
+                <div class="d-flex gap-3">
+                  <div class="form-check">
+                    <input 
+                      class="form-check-input" 
+                      type="radio" 
+                      formControlName="contactMethod" 
+                      value="email" 
+                      id="contactEmail">
+                    <label class="form-check-label" for="contactEmail">
+                      <i class="fas fa-envelope me-1"></i> Email
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input 
+                      class="form-check-input" 
+                      type="radio" 
+                      formControlName="contactMethod" 
+                      value="phone" 
+                      id="contactPhone">
+                    <label class="form-check-label" for="contactPhone">
+                      <i class="fab fa-whatsapp me-1 text-success"></i> WhatsApp/SMS
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Email Field -->
+              <div class="mb-3" *ngIf="selectedContactMethod === 'email'">
                 <label class="form-label fw-semibold">Email Address *</label>
                 <input 
                   type="email" 
                   class="form-control" 
                   formControlName="email" 
-                  [class.is-invalid]="submitted && f['email'].invalid"
+                  [class.is-invalid]="shouldShowError('email')"
                   [class.is-valid]="f['email'].valid && f['email'].dirty"
-                  placeholder="your@email.com">
-                <div class="invalid-feedback" *ngIf="submitted && f['email'].invalid">
-                  <div *ngIf="f['email'].errors?.['required']">Email is required</div>
-                  <div *ngIf="f['email'].errors?.['email']">Please enter a valid email address</div>
-                  <div *ngIf="f['email'].errors?.['pattern']">Email format is invalid</div>
+                  placeholder="your&#64;email.com"
+                  (input)="clearFieldError('email')">
+                <div class="invalid-feedback" *ngIf="shouldShowError('email') && f['email'].errors?.['required']">
+                  Email address is required
+                </div>
+                <div class="invalid-feedback" *ngIf="shouldShowError('email') && (f['email'].errors?.['email'] || f['email'].errors?.['pattern'])">
+                  Please enter a valid email address (e.g., name&#64;example.com)
+                </div>
+                <div class="invalid-feedback" *ngIf="shouldShowError('email') && f['email'].errors?.['emailExists']">
+                  An account with this email already exists. Please login or use a different email.
                 </div>
                 <div class="valid-feedback" *ngIf="f['email'].valid && f['email'].dirty">
                   ✓ Valid email address
                 </div>
               </div>
 
-              <!-- Phone Number -->
-              <div class="mb-3">
-                <label class="form-label fw-semibold">Phone Number</label>
-                <input 
-                  type="tel" 
-                  class="form-control" 
-                  formControlName="phoneNumber" 
-                  [class.is-invalid]="submitted && f['phoneNumber'].invalid && f['phoneNumber'].dirty"
-                  placeholder="+1 234 567 8900">
-                <div class="invalid-feedback" *ngIf="submitted && f['phoneNumber'].invalid && f['phoneNumber'].dirty">
-                  <div *ngIf="f['phoneNumber'].errors?.['pattern']">Enter a valid phone number (10-15 digits)</div>
+              <!-- Phone Number Field -->
+              <div class="mb-3" *ngIf="selectedContactMethod === 'phone'">
+                <label class="form-label fw-semibold">Phone Number *</label>
+                <div class="input-group">
+                  <span class="input-group-text">+91</span>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    formControlName="phoneNumber" 
+                    [class.is-invalid]="(submitted || phoneOtpSent || f['phoneNumber'].dirty) && (f['phoneNumber'].errors?.['invalidPhone'] || f['phoneNumber'].errors?.['required'])"
+                    [class.is-valid]="phoneVerified && isPhoneValid()"
+                    placeholder="9876543210"
+                    maxlength="10"
+                    (input)="clearFieldError('phoneNumber')">
                 </div>
-                <small class="text-muted">Optional but recommended for event updates</small>
+                <div class="invalid-feedback" *ngIf="(submitted || phoneOtpSent || f['phoneNumber'].dirty) && f['phoneNumber']?.errors?.['required']">
+                  Phone number is required
+                </div>
+                <div class="invalid-feedback" *ngIf="(submitted || phoneOtpSent || f['phoneNumber'].dirty) && f['phoneNumber']?.errors?.['invalidPhone']">
+                  Please enter a valid 10-digit phone number (numbers only)
+                </div>
+                
+                <!-- Simulated OTP Section -->
+                <div class="mt-2" *ngIf="!phoneVerified">
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-primary btn-sm w-100 mb-2"
+                    (click)="sendPhoneOTP()"
+                    [disabled]="loading || !isPhoneValid()">
+                    <i class="fas fa-paper-plane me-1"></i>
+                    {{ phoneOtpSent ? 'Resend OTP' : 'Send Verification Code' }}
+                    <span *ngIf="timer > 0 && phoneOtpSent" class="ms-2">({{ timer }}s)</span>
+                  </button>
+                  
+                  <div class="input-group" *ngIf="phoneOtpSent">
+                    <input 
+                      type="text" 
+                      class="form-control" 
+                      placeholder="Enter 6-digit OTP"
+                      [(ngModel)]="phoneOtpCode"
+                      [ngModelOptions]="{standalone: true}"
+                      maxlength="6"
+                      oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                    <button 
+                      class="btn btn-primary" 
+                      type="button"
+                      (click)="verifyPhoneOTP()"
+                      [disabled]="loading || phoneOtpCode.length !== 6">
+                      Verify
+                    </button>
+                  </div>
+                  
+                  <div class="alert alert-info mt-2" *ngIf="phoneOtpSent && !phoneVerified">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Demo Mode:</strong> Use OTP code <strong>{{ simulatedOtp }}</strong> for verification
+                  </div>
+                </div>
+                
+                <div class="alert alert-success mt-2" *ngIf="phoneVerified">
+                  <i class="fas fa-check-circle me-1"></i>
+                  <strong>✓ Phone number verified successfully!</strong>
+                </div>
+                
+                <small class="text-muted">Enter a valid 10-digit phone number (numbers only)</small>
               </div>
 
               <!-- Password Section -->
               <div class="mb-3">
                 <label class="form-label fw-semibold">Password *</label>
-                <div class="input-group">
+                <div style="position: relative;">
                   <input 
                     [type]="showPassword ? 'text' : 'password'" 
                     class="form-control" 
                     formControlName="password" 
                     [class.is-invalid]="submitted && f['password'].invalid"
-                    placeholder="Min 8 characters with uppercase, lowercase, number & special character">
+                    placeholder="Min 8 characters with uppercase, lowercase, number & special character"
+                    style="padding-right: 40px;">
                   <button 
-                    class="btn btn-outline-secondary" 
                     type="button"
-                    (click)="togglePasswordVisibility('password')">
-                    <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    (click)="togglePasswordVisibility()"
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; z-index: 10;">
+                    <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" style="color: #6c757d;"></i>
                   </button>
                 </div>
                 
-                <!-- Password Requirements Checklist - Fixed @ symbol -->
+                <!-- Password Requirements Checklist -->
                 <div class="password-requirements mt-2" *ngIf="f['password'].value && !isPasswordStrong()">
                   <small class="text-muted d-block mb-1">Password must contain:</small>
                   <div class="requirement" [class.valid]="getPasswordRequirements().minLength">
@@ -149,21 +241,22 @@
                 </div>
               </div>
 
-              <!-- Confirm Password -->
+              <!-- Confirm Password Section -->
               <div class="mb-3">
                 <label class="form-label fw-semibold">Confirm Password *</label>
-                <div class="input-group">
+                <div style="position: relative;">
                   <input 
                     [type]="showConfirmPassword ? 'text' : 'password'" 
                     class="form-control" 
                     formControlName="confirmPassword" 
                     [class.is-invalid]="submitted && (f['confirmPassword'].invalid || form.errors?.['passwordMismatch'])"
-                    placeholder="Confirm your password">
+                    placeholder="Confirm your password"
+                    style="padding-right: 40px;">
                   <button 
-                    class="btn btn-outline-secondary" 
                     type="button"
-                    (click)="togglePasswordVisibility('confirm')">
-                    <i [class]="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    (click)="toggleConfirmPasswordVisibility()"
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; z-index: 10;">
+                    <i [class]="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'" style="color: #6c757d;"></i>
                   </button>
                 </div>
                 
@@ -195,7 +288,8 @@
                   class="form-check-input" 
                   id="terms" 
                   formControlName="acceptTerms"
-                  [class.is-invalid]="submitted && f['acceptTerms'].invalid">
+                  [class.is-invalid]="submitted && f['acceptTerms'].invalid"
+                  (change)="clearFieldError('acceptTerms')">
                 <label class="form-check-label" for="terms">
                   I agree to the Terms and Conditions *
                 </label>
@@ -205,7 +299,9 @@
               </div>
 
               <!-- Submit Button -->
-              <button class="btn btn-primary w-100 py-2 mt-2" type="submit" [disabled]="loading || form.pending || (f['password'].value && !isPasswordStrong())">
+              <button class="btn btn-primary w-100 py-2 mt-2" 
+                      type="submit" 
+                      [disabled]="loading || form.pending || (f['password'].value && !isPasswordStrong()) || (selectedContactMethod === 'phone' && !phoneVerified)">
                 <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
                 <i *ngIf="!loading" class="fas fa-user-plus me-2"></i>
                 {{ loading ? 'Creating Account...' : 'Create Account' }}
@@ -214,6 +310,12 @@
               <div class="text-center mt-2" *ngIf="f['password'].value && !isPasswordStrong()">
                 <small class="text-danger">
                   <i class="fas fa-info-circle"></i> Please meet all password requirements to register
+                </small>
+              </div>
+              
+              <div class="text-center mt-2" *ngIf="selectedContactMethod === 'phone' && !phoneVerified && phoneOtpSent">
+                <small class="text-warning">
+                  <i class="fas fa-info-circle"></i> Please verify your phone number to complete registration
                 </small>
               </div>
             </form>
