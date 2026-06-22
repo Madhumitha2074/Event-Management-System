@@ -19,6 +19,17 @@ export class EventFormComponent implements OnInit {
   enableSeatConfig = false;
   formSubmitted = false;
 
+  // ✅ Date validation properties
+  minDate: string = '';
+  maxDate: string = '';
+
+  // ✅ Read-only mode properties
+  isEventCompleted = false;
+  isEventCancelled = false;
+  isEventStarted = false;
+  eventStatus = '';
+  isReadOnly = false;
+
   private readonly categoryMap: Record<string, number> = {
     'Music': 0, 'Sports': 1, 'Technology': 2, 'Food': 3,
     'Art': 4, 'Business': 5, 'Health': 6, 'Other': 7
@@ -64,6 +75,19 @@ export class EventFormComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    // ✅ Set min date to current time (prevent past dates)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    this.minDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    // ✅ Set max date to 1 year from now
+    const maxYear = now.getFullYear() + 1;
+    this.maxDate = `${maxYear}-${month}-${day}T${hours}:${minutes}`;
+
     this.initializeForm();
     this.loadEventIfEditing();
   }
@@ -72,6 +96,99 @@ export class EventFormComponent implements OnInit {
     if (!control) return false;
     return this.formSubmitted && control.invalid;
   }
+
+  // ─────────────────────────────────────────────
+  // ✅ DATE VALIDATION METHODS
+  // ─────────────────────────────────────────────
+
+  /**
+   * Validate dates and set errors
+   */
+  validateDates(): void {
+    const startDate = this.form.get('startDateTime')?.value;
+    const endDate = this.form.get('endDateTime')?.value;
+    const now = new Date();
+
+    if (startDate) {
+      const start = new Date(startDate);
+      if (start < now) {
+        this.form.get('startDateTime')?.setErrors({ pastDate: true });
+      } else {
+        // Clear past date error if valid
+        const errors = this.form.get('startDateTime')?.errors;
+        if (errors) {
+          delete errors['pastDate'];
+          if (Object.keys(errors).length === 0) {
+            this.form.get('startDateTime')?.setErrors(null);
+          }
+        }
+      }
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      if (end < now) {
+        this.form.get('endDateTime')?.setErrors({ pastDate: true });
+      } else {
+        const errors = this.form.get('endDateTime')?.errors;
+        if (errors) {
+          delete errors['pastDate'];
+          if (Object.keys(errors).length === 0) {
+            this.form.get('endDateTime')?.setErrors(null);
+          }
+        }
+      }
+    }
+
+    // Check if end date is after start date
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end <= start) {
+        this.form.get('endDateTime')?.setErrors({ beforeStart: true });
+      } else {
+        const errors = this.form.get('endDateTime')?.errors;
+        if (errors) {
+          delete errors['beforeStart'];
+          if (Object.keys(errors).length === 0) {
+            this.form.get('endDateTime')?.setErrors(null);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if start date is in past
+   */
+  isStartDateInPast(): boolean {
+    const startDate = this.form.get('startDateTime')?.value;
+    if (!startDate) return false;
+    return new Date(startDate) < new Date();
+  }
+
+  /**
+   * Check if end date is in past
+   */
+  isEndDateInPast(): boolean {
+    const endDate = this.form.get('endDateTime')?.value;
+    if (!endDate) return false;
+    return new Date(endDate) <= new Date();
+  }
+
+  /**
+   * Check if end date is before start date
+   */
+  isEndDateBeforeStart(): boolean {
+    const startDate = this.form.get('startDateTime')?.value;
+    const endDate = this.form.get('endDateTime')?.value;
+    if (!startDate || !endDate) return false;
+    return new Date(endDate) <= new Date(startDate);
+  }
+
+  // ─────────────────────────────────────────────
+  // FORM INITIALIZATION
+  // ─────────────────────────────────────────────
 
   initializeForm(): void {
     this.form = this.fb.group({
@@ -87,7 +204,7 @@ export class EventFormComponent implements OnInit {
       imageUrl: ['', [EventFormComponent.imageValidator]],
       googleMapsUrl: [''],
       ticketPrice: [0, [Validators.required, Validators.min(0)]],
-      totalTickets: [100, [Validators.required, Validators.min(1)]],
+      totalTickets: ['', [Validators.required, Validators.min(1)]],
       status: ['Draft'],
       seatTiers: this.fb.array([])
     }, { 
@@ -95,6 +212,15 @@ export class EventFormComponent implements OnInit {
         EventFormComponent.dateRangeValidator,
         EventFormComponent.pastDateValidator
       ] 
+    });
+
+    // ✅ Add value change listeners for date validation
+    this.form.get('startDateTime')?.valueChanges.subscribe(() => {
+      this.validateDates();
+    });
+
+    this.form.get('endDateTime')?.valueChanges.subscribe(() => {
+      this.validateDates();
     });
   }
 
@@ -108,6 +234,38 @@ export class EventFormComponent implements OnInit {
         next: (ev) => {
           console.log('📋 Loading event data:', ev);
           
+          // ✅ Check event status
+          this.eventStatus = ev.status || '';
+          this.isEventCompleted = ev.status === 'Completed';
+          this.isEventCancelled = ev.status === 'Cancelled';
+          
+          // ✅ Check if event has already started
+          const startDate = new Date(ev.startDateTime);
+          const now = new Date();
+          this.isEventStarted = startDate <= now;
+
+          // ✅ Determine if form should be read-only
+          this.isReadOnly = this.isEventCompleted || this.isEventCancelled || this.isEventStarted;
+
+          // ✅ If event is completed, cancelled, or started, disable the form
+          if (this.isReadOnly) {
+            this.form.disable();
+            
+            let message = '';
+            if (this.isEventCompleted) {
+              message = 'This event has been completed and cannot be edited.';
+            } else if (this.isEventCancelled) {
+              message = 'This event has been cancelled and cannot be edited.';
+            } else if (this.isEventStarted) {
+              message = 'This event has already started and cannot be edited.';
+            }
+            
+            this.toastr.warning(message, 'Read-Only Mode', {
+              timeOut: 5000,
+              positionClass: 'toast-top-right'
+            });
+          }
+
           this.form.patchValue({
             title: ev.title || '',
             description: ev.description || '',
@@ -121,7 +279,7 @@ export class EventFormComponent implements OnInit {
             imageUrl: ev.imageUrl || '',
             googleMapsUrl: ev.googleMapsUrl || '',
             ticketPrice: ev.ticketPrice || 0,
-            totalTickets: ev.totalTickets || 100,
+            totalTickets: ev.totalTickets || '',
             status: ev.status || 'Draft'
           });
 
@@ -304,7 +462,29 @@ export class EventFormComponent implements OnInit {
   // ============= FORM SUBMISSION =============
 
   onSubmit(): void {
+    // ✅ Prevent submission if read-only
+    if (this.isReadOnly) {
+      this.toastr.warning('This event cannot be edited.', 'Read-Only');
+      return;
+    }
+
     this.formSubmitted = true;
+    
+    // ✅ Validate dates before submitting
+    if (this.isStartDateInPast()) {
+      this.toastr.error('Start date cannot be in the past. Please select a future date.', 'Invalid Date');
+      return;
+    }
+
+    if (this.isEndDateInPast()) {
+      this.toastr.error('End date must be in the future.', 'Invalid Date');
+      return;
+    }
+
+    if (this.isEndDateBeforeStart()) {
+      this.toastr.error('End date must be after the start date.', 'Invalid Date');
+      return;
+    }
     
     if (this.form.invalid) {
       // Mark all fields as touched on submit

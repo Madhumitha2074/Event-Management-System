@@ -8,17 +8,16 @@ namespace EventBooking.API.Services
     public interface IBookingService
     {
         Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int userId);
-
-        // NEW: Create booking with specific seats
         Task<BookingDto> CreateBookingWithSeatsAsync(CreateBookingWithSeatsDto dto, int userId);
         Task<List<BookingDto>> GetUserBookingsAsync(int userId);
         Task<BookingDto> GetBookingByIdAsync(int id, int userId);
         Task CancelBookingAsync(int id, int userId);
         Task<List<BookingDto>> GetEventBookingsAsync(int eventId, int organizerId);
         Task<byte[]> GenerateBookingPdfAsync(int bookingId, int userId);
-        
-        // NEW: Verify ticket via QR code
         Task<TicketVerificationDto> VerifyTicketAsync(string qrData);
+        
+        // ✅ ADD THIS METHOD
+        Task<bool> HasBookingsAsync(int eventId);
     }
 
     public class BookingService : IBookingService
@@ -657,6 +656,27 @@ namespace EventBooking.API.Services
         {
             var booking = await GetBookingByIdAsync(bookingId, userId);
             return await Task.Run(() => _pdfService.GenerateBookingPdf(booking));
+        }
+
+        // ─────────────────────────────────────────────
+        // ✅ CHECK IF EVENT HAS BOOKINGS
+        // ─────────────────────────────────────────────
+        public async Task<bool> HasBookingsAsync(int eventId)
+        {
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            string query = @"
+                SELECT COUNT(1) 
+                FROM Bookings 
+                WHERE EventId = @EventId 
+                AND Status IN ('Confirmed', 'Pending')";
+
+            using var cmd = new SqlCommand(query, connection);
+            cmd.Parameters.AddWithValue("@EventId", eventId);
+
+            int count = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+            return count > 0;
         }
 
         // ─────────────────────────────────────────────

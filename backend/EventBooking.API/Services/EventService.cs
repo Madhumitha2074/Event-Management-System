@@ -261,14 +261,25 @@ namespace EventBooking.API.Services
         // ─────────────────────────────────────────────
         public async Task<EventDto> CreateEventAsync(CreateEventDto dto, int organizerId)
         {
+            // ✅ Validate Start Date format
             if (!DateTime.TryParse(dto.StartDateTime, out DateTime startDateTime))
-                throw new ArgumentException("Invalid StartDateTime format.");
+                throw new ArgumentException("Invalid StartDateTime format. Please use a valid date format.");
 
+            // ✅ Validate End Date format
             if (!DateTime.TryParse(dto.EndDateTime, out DateTime endDateTime))
-                throw new ArgumentException("Invalid EndDateTime format.");
+                throw new ArgumentException("Invalid EndDateTime format. Please use a valid date format.");
 
+            // ✅ Check if Start Date is in the past
+            if (startDateTime < DateTime.UtcNow)
+                throw new ArgumentException("Start date cannot be in the past. Please select a future date.");
+
+            // ✅ Check if End Date is in the past
+            if (endDateTime <= DateTime.UtcNow)
+                throw new ArgumentException("End date must be in the future.");
+
+            // ✅ Check if End Date is after Start Date
             if (endDateTime <= startDateTime)
-                throw new ArgumentException("EndDateTime must be after StartDateTime.");
+                throw new ArgumentException("End date must be after the start date.");
 
             string categoryName = (dto.Category >= 0 && dto.Category < CategoryNames.Length)
                 ? CategoryNames[dto.Category]
@@ -358,14 +369,46 @@ namespace EventBooking.API.Services
         // ─────────────────────────────────────────────
         public async Task<EventDto> UpdateEventAsync(int id, UpdateEventDto dto, int organizerId)
         {
+            // ✅ First, get the existing event to check status
+            var existingEvent = await GetEventByIdAsync(id);
+            
+            // ✅ Prevent editing completed events
+            if (existingEvent.Status == "Completed")
+            {
+                throw new InvalidOperationException("Cannot edit a completed event.");
+            }
+            
+            // ✅ Prevent editing cancelled events
+            if (existingEvent.Status == "Cancelled")
+            {
+                throw new InvalidOperationException("Cannot edit a cancelled event.");
+            }
+
+            // ✅ Prevent editing if event has already started
+            if (DateTime.Parse(existingEvent.StartDateTime) < DateTime.UtcNow)
+            {
+                throw new InvalidOperationException("Cannot edit an event that has already started.");
+            }
+
+            // ✅ Validate Start Date format
             if (!DateTime.TryParse(dto.StartDateTime, out DateTime startDateTime))
-                throw new ArgumentException("Invalid StartDateTime format.");
+                throw new ArgumentException("Invalid StartDateTime format. Please use a valid date format.");
 
+            // ✅ Validate End Date format
             if (!DateTime.TryParse(dto.EndDateTime, out DateTime endDateTime))
-                throw new ArgumentException("Invalid EndDateTime format.");
+                throw new ArgumentException("Invalid EndDateTime format. Please use a valid date format.");
 
+            // ✅ Check if new Start Date is in the past
+            if (startDateTime < DateTime.UtcNow)
+                throw new ArgumentException("Start date cannot be in the past. Please select a future date.");
+
+            // ✅ Check if new End Date is in the past
+            if (endDateTime <= DateTime.UtcNow)
+                throw new ArgumentException("End date must be in the future.");
+
+            // ✅ Check if End Date is after Start Date
             if (endDateTime <= startDateTime)
-                throw new ArgumentException("EndDateTime must be after StartDateTime.");
+                throw new ArgumentException("End date must be after the start date.");
 
             string categoryName = (dto.Category >= 0 && dto.Category < CategoryNames.Length)
                 ? CategoryNames[dto.Category]

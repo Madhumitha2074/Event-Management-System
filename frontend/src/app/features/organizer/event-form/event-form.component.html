@@ -73,27 +73,66 @@
                 </div>
               </div>
 
-              <!-- Date & Time -->
-              <div class="col-md-6">
-                <label class="form-label">Start Date & Time *</label>
-                <input type="datetime-local" class="form-control" formControlName="startDateTime"
-                       [class.is-invalid]="shouldShowError(startDateTime) || (form.errors?.['pastDate'] && formSubmitted)">
-                <div *ngIf="shouldShowError(startDateTime)" class="text-danger small">
-                  <span *ngIf="startDateTime?.errors?.['required']">Start date is required.</span>
-                </div>
-                <div *ngIf="form.errors?.['pastDate'] && formSubmitted" class="text-danger small">
-                  <i class="fas fa-exclamation-circle me-1"></i>
-                  Start date must be in the future!
+              <!-- ════════════════════════════════════════════════ -->
+              <!-- DATE & TIME WITH VALIDATION                     -->
+              <!-- ════════════════════════════════════════════════ -->
+              <div class="col-12">
+                <div class="alert alert-info small">
+                  <i class="fas fa-info-circle me-1"></i>
+                  <strong>Note:</strong> Start and End dates must be in the future. 
+                  The event will be created as "Draft" until published.
                 </div>
               </div>
 
+              <!-- Start Date & Time -->
               <div class="col-md-6">
-                <label class="form-label">End Date & Time *</label>
-                <input type="datetime-local" class="form-control" formControlName="endDateTime"
-                       [class.is-invalid]="shouldShowError(endDateTime)">
-                <div *ngIf="shouldShowError(endDateTime)" class="text-danger small">
+                <label class="form-label">
+                  <i class="far fa-calendar-alt me-1 text-primary"></i>
+                  Start Date & Time *
+                </label>
+                <input 
+                  type="datetime-local" 
+                  class="form-control" 
+                  formControlName="startDateTime"
+                  [min]="minDate"
+                  [class.is-invalid]="(shouldShowError(startDateTime) || isStartDateInPast()) && (formSubmitted || startDateTime?.touched)"
+                  (change)="validateDates()"
+                  (blur)="validateDates()"
+                >
+                <div *ngIf="shouldShowError(startDateTime) && (formSubmitted || startDateTime?.touched)" class="text-danger small">
+                  <span *ngIf="startDateTime?.errors?.['required']">Start date is required.</span>
+                </div>
+                <div *ngIf="isStartDateInPast() && (formSubmitted || startDateTime?.touched)" class="text-danger small">
+                  <i class="fas fa-exclamation-circle me-1"></i>
+                  ⚠️ Start date cannot be in the past. Please select a future date.
+                </div>
+              </div>
+
+              <!-- End Date & Time -->
+              <div class="col-md-6">
+                <label class="form-label">
+                  <i class="far fa-calendar-alt me-1 text-primary"></i>
+                  End Date & Time *
+                </label>
+                <input 
+                  type="datetime-local" 
+                  class="form-control" 
+                  formControlName="endDateTime"
+                  [min]="minDate"
+                  [class.is-invalid]="(shouldShowError(endDateTime) || isEndDateInPast() || isEndDateBeforeStart()) && (formSubmitted || endDateTime?.touched)"
+                  (change)="validateDates()"
+                  (blur)="validateDates()"
+                >
+                <div *ngIf="shouldShowError(endDateTime) && (formSubmitted || endDateTime?.touched)" class="text-danger small">
                   <span *ngIf="endDateTime?.errors?.['required']">End date is required.</span>
-                  <span *ngIf="form?.errors?.['dateRange']">End date must be after start date.</span>
+                </div>
+                <div *ngIf="isEndDateInPast() && (formSubmitted || endDateTime?.touched)" class="text-danger small">
+                  <i class="fas fa-exclamation-circle me-1"></i>
+                  ⚠️ End date cannot be in the past. Please select a future date.
+                </div>
+                <div *ngIf="isEndDateBeforeStart() && (formSubmitted || endDateTime?.touched)" class="text-danger small">
+                  <i class="fas fa-exclamation-circle me-1"></i>
+                  ⚠️ End date must be after the start date.
                 </div>
               </div>
 
@@ -297,7 +336,7 @@
 
             <!-- Action Buttons -->
             <div class="d-flex gap-3 mt-4">
-              <button class="btn btn-primary px-4" type="submit" [disabled]="loading || form.invalid">
+              <button class="btn btn-primary px-4" type="submit" [disabled]="loading || form.invalid || isStartDateInPast() || isEndDateInPast() || isEndDateBeforeStart()">
                 <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
                 {{ isEdit ? 'Update Event' : 'Create Event' }}
               </button>
@@ -305,6 +344,22 @@
                       (click)="goToOrganizer()">
                 Cancel
               </button>
+            </div>
+
+            <!-- Validation Summary -->
+            <div *ngIf="(formSubmitted && form.invalid) || isStartDateInPast() || isEndDateInPast() || isEndDateBeforeStart()" 
+                 class="alert alert-danger mt-3">
+              <i class="fas fa-exclamation-circle me-2"></i>
+              <strong>Please fix the following issues before submitting:</strong>
+              <ul class="mb-0 mt-1">
+                <li *ngIf="isStartDateInPast()">⚠️ Start date cannot be in the past</li>
+                <li *ngIf="isEndDateInPast()">⚠️ End date cannot be in the past</li>
+                <li *ngIf="isEndDateBeforeStart()">⚠️ End date must be after the start date</li>
+                <li *ngIf="title?.errors?.['required']">Title is required</li>
+                <li *ngIf="description?.errors?.['required']">Description is required</li>
+                <li *ngIf="venue?.errors?.['required']">Venue is required</li>
+                <li *ngIf="city?.errors?.['required']">City is required</li>
+              </ul>
             </div>
 
           </form>

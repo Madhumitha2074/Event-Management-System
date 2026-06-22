@@ -131,9 +131,34 @@ namespace EventBooking.API.Controllers
             {
                 _logger.LogInformation("📥 Creating event for user {OrganizerId}", organizerId);
 
-                if (DateTime.TryParse(dto.EndDateTime, out DateTime endDateTime) && endDateTime <= DateTime.UtcNow)
+                // ✅ Validate Start Date
+                if (!DateTime.TryParse(dto.StartDateTime, out DateTime startDateTime))
+                {
+                    return BadRequest(new { message = "Invalid Start Date format." });
+                }
+
+                // ✅ Validate End Date
+                if (!DateTime.TryParse(dto.EndDateTime, out DateTime endDateTime))
+                {
+                    return BadRequest(new { message = "Invalid End Date format." });
+                }
+
+                // ✅ Check if Start Date is in the past
+                if (startDateTime < DateTime.UtcNow)
+                {
+                    return BadRequest(new { message = "Start date cannot be in the past. Please select a future date." });
+                }
+
+                // ✅ Check if End Date is in the past
+                if (endDateTime <= DateTime.UtcNow)
                 {
                     return BadRequest(new { message = "End date must be in the future." });
+                }
+
+                // ✅ Check if End Date is after Start Date
+                if (endDateTime <= startDateTime)
+                {
+                    return BadRequest(new { message = "End date must be after Start date." });
                 }
 
                 if (dto.SeatTiers != null && dto.SeatTiers.Any())
@@ -176,12 +201,56 @@ namespace EventBooking.API.Controllers
             {
                 _logger.LogInformation("📥 Updating event {EventId} for user {OrganizerId}", id, organizerId);
 
+                // ✅ Get the existing event
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
-                if (!existingEvent.IsActive && existingEvent.Status == "Completed")
+                
+                // ✅ Prevent editing if event is Completed
+                if (existingEvent.Status == "Completed")
                 {
-                    return BadRequest(new { message = "Cannot update an expired event." });
+                    return BadRequest(new { message = "Cannot edit a completed event." });
+                }
+                
+                // ✅ Prevent editing if event is Cancelled
+                if (existingEvent.Status == "Cancelled")
+                {
+                    return BadRequest(new { message = "Cannot edit a cancelled event." });
                 }
 
+                // ✅ Prevent editing if event has already started
+                var startDateTime = DateTime.Parse(existingEvent.StartDateTime);
+                if (startDateTime < DateTime.UtcNow)
+                {
+                    return BadRequest(new { message = "Cannot edit an event that has already started." });
+                }
+
+                // ✅ Check if dates are being updated and validate
+                if (!string.IsNullOrEmpty(dto.StartDateTime))
+                {
+                    if (!DateTime.TryParse(dto.StartDateTime, out DateTime newStartDateTime))
+                    {
+                        return BadRequest(new { message = "Invalid Start Date format." });
+                    }
+                    
+                    if (newStartDateTime < DateTime.UtcNow)
+                    {
+                        return BadRequest(new { message = "Start date cannot be in the past." });
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(dto.EndDateTime))
+                {
+                    if (!DateTime.TryParse(dto.EndDateTime, out DateTime newEndDateTime))
+                    {
+                        return BadRequest(new { message = "Invalid End Date format." });
+                    }
+                    
+                    if (newEndDateTime <= DateTime.UtcNow)
+                    {
+                        return BadRequest(new { message = "End date must be in the future." });
+                    }
+                }
+
+                // ✅ Proceed with update
                 var ev = await _eventService.UpdateEventAsync(id, dto, organizerId);
                 _logger.LogInformation("✅ Event {EventId} updated successfully", id);
                 return Ok(ev);
@@ -198,6 +267,10 @@ namespace EventBooking.API.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(403, new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -219,6 +292,27 @@ namespace EventBooking.API.Controllers
             try
             {
                 _logger.LogInformation("📥 Deleting event {EventId} for user {OrganizerId}", id, organizerId);
+                
+                // ✅ Check if event can be deleted
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                
+                if (existingEvent.Status == "Completed")
+                {
+                    return BadRequest(new { message = "Cannot delete a completed event." });
+                }
+                
+                if (existingEvent.Status == "Cancelled")
+                {
+                    return BadRequest(new { message = "Cannot delete a cancelled event." });
+                }
+
+                // ✅ Check if event has bookings
+                var hasBookings = await _bookingService.HasBookingsAsync(id);
+                if (hasBookings)
+                {
+                    return BadRequest(new { message = "Cannot delete an event with existing bookings." });
+                }
+
                 await _eventService.DeleteEventAsync(id, organizerId);
                 _logger.LogInformation("✅ Event {EventId} deleted successfully", id);
                 return NoContent();

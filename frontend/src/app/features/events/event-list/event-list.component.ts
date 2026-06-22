@@ -1446,6 +1446,61 @@ export class EventListComponent implements OnInit, OnDestroy {
     return diffMinutes > 0 && diffMinutes <= 15;
   }
 
+  /**
+   * ✅ Check if event can be edited
+   */
+  canEditEvent(event: Event): boolean {
+    // Can't edit if status is Completed or Cancelled
+    if (event.status === 'Completed' || event.status === 'Cancelled') {
+      return false;
+    }
+    
+    // Can't edit if event has already started
+    const startDate = new Date(event.startDateTime);
+    const now = new Date();
+    if (startDate <= now) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * ✅ Get tooltip message for disabled edit button
+   */
+  getEditDisabledReason(event: Event): string {
+    if (event.status === 'Completed') {
+      return 'This event is completed and cannot be edited.';
+    }
+    if (event.status === 'Cancelled') {
+      return 'This event is cancelled and cannot be edited.';
+    }
+    const startDate = new Date(event.startDateTime);
+    const now = new Date();
+    if (startDate <= now) {
+      return 'This event has already started and cannot be edited.';
+    }
+    return '';
+  }
+
+  /**
+   * ✅ Get status badge class
+   */
+  getStatusBadgeClass(status: string): string {
+    switch (status) {
+      case 'Published':
+        return 'bg-success';
+      case 'Draft':
+        return 'bg-secondary';
+      case 'Completed':
+        return 'bg-dark';
+      case 'Cancelled':
+        return 'bg-danger';
+      default:
+        return 'bg-info';
+    }
+  }
+
   cleanupExpiredEvents(): void {
     if (!this.isAdmin) {
       this.toastr.warning('Admin access required', 'Permission Denied');
