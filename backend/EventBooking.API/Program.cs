@@ -30,6 +30,7 @@ builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 // ✅ Register Image Service
 builder.Services.AddScoped<IImageService, ImageService>();
 
+
 //  camelCase JSON output
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

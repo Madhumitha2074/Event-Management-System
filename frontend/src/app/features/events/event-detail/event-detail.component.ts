@@ -16,6 +16,15 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
     </div>
 
     <div *ngIf="event && !loading">
+      <!-- ⚠️ EXPIRED EVENT BANNER -->
+      <div *ngIf="isExpired" class="container mt-3">
+        <div class="alert alert-danger text-center shadow-sm">
+          <i class="fas fa-clock me-2 fa-lg"></i>
+          <strong>This event has ended!</strong> 
+          It was held on {{ event.endDateTime | date:'EEEE, MMMM d, y - h:mm a' }}
+        </div>
+      </div>
+
       <!-- Hero Section with Gradient Overlay -->
       <div class="hero-section position-relative" style="height: 450px; overflow: hidden;">
         <img [src]="event.imageUrl || 'https://placehold.co/1600x450?text=Event+Image'"
@@ -29,7 +38,7 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
           <span class="badge-event-category mb-3 d-inline-block">{{ event.category }}</span>
           <h1 class="display-4 fw-bold mb-2">{{ event.title }}</h1>
           <p class="mb-2"><i class="fas fa-user-circle me-2"></i>Hosted by {{ event.organizerName }}</p>
-          <div class="d-flex gap-4 mt-3">
+          <div class="d-flex gap-4 mt-3 flex-wrap">
             <span><i class="fas fa-calendar-alt me-2"></i>{{ event.startDateTime | date:'fullDate' }}</span>
             <span><i class="fas fa-clock me-2"></i>{{ event.startDateTime | date:'h:mm a' }} - {{ event.endDateTime | date:'h:mm a' }}</span>
             <span><i class="fas fa-location-dot me-2"></i>{{ event.venue }}, {{ event.city }}</span>
@@ -135,6 +144,29 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                       </div>
                     </div>
                   </div>
+
+                  <!-- ✅ NEW: Event Status -->
+                  <div class="col-md-6">
+                    <div class="info-item">
+                      <div class="info-icon">
+                        <i class="fas fa-info-circle fa-2x" [class.text-success]="!isExpired" [class.text-danger]="isExpired"></i>
+                      </div>
+                      <div class="info-content">
+                        <div class="info-label">Event Status</div>
+                        <div class="info-value" [class.text-success]="!isExpired" [class.text-danger]="isExpired">
+                          <span *ngIf="!isExpired">
+                            <i class="fas fa-check-circle me-1"></i> Active
+                          </span>
+                          <span *ngIf="isExpired">
+                            <i class="fas fa-clock me-1"></i> Ended
+                          </span>
+                        </div>
+                        <div class="info-small" *ngIf="!isExpired">
+                          {{ getTimeRemaining() }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -147,7 +179,7 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
             <ng-container *ngIf="!isOrganizer">
               
               <!-- Seat Map Toggle Card -->
-              <div class="booking-card" *ngIf="hasSeatMap">
+              <div class="booking-card" *ngIf="hasSeatMap && !isExpired">
                 <div class="booking-card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -159,7 +191,7 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                              id="seatSelectionToggle" 
                              [(ngModel)]="enableSeatSelection"
                              (ngModelChange)="onSeatToggleChange($event)"
-                             [disabled]="selectionDisabled"
+                             [disabled]="selectionDisabled || isExpired"
                              style="width: 50px; height: 25px; cursor: pointer;">
                     </div>
                   </div>
@@ -170,12 +202,12 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
               </div>
 
               <!-- Seat Map Component -->
-              <div *ngIf="enableSeatSelection && hasSeatMap && seats.length > 0" class="mt-3">
+              <div *ngIf="enableSeatSelection && hasSeatMap && seats.length > 0 && !isExpired" class="mt-3">
                 <app-seat-map
                   #seatMapRef
                   [seats]="seats"
                   [maxSelectable]="10"
-                  [selectionDisabled]="selectionDisabled"
+                  [selectionDisabled]="selectionDisabled || isExpired"
                   [loading]="loadingSeats"
                   (selectionChange)="onSeatSelectionChange($event)">
                 </app-seat-map>
@@ -186,6 +218,20 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                    class="booking-card mt-3 text-center py-4">
                 <div class="spinner-border text-primary mb-2"></div>
                 <p class="text-muted mb-0">Loading seat map...</p>
+              </div>
+
+              <!-- Expired Event Message -->
+              <div *ngIf="isExpired" class="booking-card mt-3">
+                <div class="booking-card-header" style="background: #dc3545;">
+                  <i class="fas fa-clock me-2"></i>
+                  <span class="fw-bold">Event Ended</span>
+                </div>
+                <div class="booking-card-body text-center py-4">
+                  <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
+                  <h5 class="text-muted">This event has ended</h5>
+                  <p class="text-muted">Bookings are no longer available for this event.</p>
+                  <p class="text-muted small">Ended on {{ event.endDateTime | date:'EEEE, MMMM d, y - h:mm a' }}</p>
+                </div>
               </div>
 
               <!-- Traditional Booking Card -->
@@ -227,7 +273,8 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                     <i class="fas fa-times-circle me-2"></i>Sold Out
                   </div>
 
-                  <form *ngIf="event.availableTickets > 0 && isLoggedIn" [formGroup]="bookingForm" (ngSubmit)="book()">
+                  <form *ngIf="event.availableTickets > 0 && isLoggedIn && !isExpired" 
+                        [formGroup]="bookingForm" (ngSubmit)="book()">
                     <div class="mb-3">
                       <label class="form-label fw-semibold">Number of Tickets</label>
                       <select class="form-select" formControlName="ticketCount" (change)="updateAttendees()" 
@@ -267,15 +314,23 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                     </button>
                   </form>
 
-                  <div *ngIf="!isLoggedIn" class="text-center py-3">
+                  <div *ngIf="!isLoggedIn && !isExpired" class="text-center py-3">
                     <p class="text-muted mb-2">Sign in to book tickets</p>
                     <a routerLink="/auth/login" class="btn btn-primary w-100">Sign In</a>
+                  </div>
+
+                  <div *ngIf="isExpired" class="text-center py-3">
+                    <p class="text-muted mb-0">
+                      <i class="fas fa-lock me-2"></i>
+                      Booking is disabled for this event
+                    </p>
                   </div>
                 </div>
               </div>
 
               <!-- Seat-based booking summary -->
-              <div *ngIf="enableSeatSelection && hasSeatMap && selectedSeats.length > 0" class="booking-card mt-3">
+              <div *ngIf="enableSeatSelection && hasSeatMap && selectedSeats.length > 0 && !isExpired" 
+                   class="booking-card mt-3">
                 <div class="booking-card-header">
                   <i class="fas fa-shopping-cart me-2"></i>
                   <span class="fw-bold">Booking Summary</span>
@@ -293,11 +348,11 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                         <input type="text" class="form-control form-control-sm" 
                                placeholder="Full Name" [(ngModel)]="seatAttendees[i].name" 
                                [ngModelOptions]="{standalone: true}"
-                               [disabled]="bookingLoading || selectionDisabled">
+                               [disabled]="bookingLoading || selectionDisabled || isExpired">
                         <input type="email" class="form-control form-control-sm mt-1" 
                                placeholder="Email" [(ngModel)]="seatAttendees[i].email"
                                [ngModelOptions]="{standalone: true}"
-                               [disabled]="bookingLoading || selectionDisabled">
+                               [disabled]="bookingLoading || selectionDisabled || isExpired">
                       </div>
                     </div>
                   </div>
@@ -308,7 +363,7 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
                   </div>
 
                   <button class="btn-book w-100 mt-3" (click)="bookWithSeats()" 
-                          [disabled]="bookingLoading || !isSeatAttendeesValid() || selectionDisabled">
+                          [disabled]="bookingLoading || !isSeatAttendeesValid() || selectionDisabled || isExpired">
                     <span *ngIf="bookingLoading" class="spinner-border spinner-border-sm me-2"></span>
                     <i *ngIf="!bookingLoading" class="fas fa-check-circle me-2"></i>
                     {{ bookingLoading ? 'Processing...' : 'Confirm & Book' }}
@@ -533,6 +588,11 @@ import { SeatMapComponent } from '../seat-map/seat-map.component';
       border-color: #6c5ce7;
       box-shadow: 0 0 0 0.2rem rgba(108,92,231,0.25);
     }
+    .alert-danger {
+      background-color: #f8d7da;
+      border-color: #f5c6cb;
+      color: #721c24;
+    }
     @media (max-width: 768px) {
       .hero-section { height: 350px; }
       .detail-card-header, .detail-card-body { padding: 16px; }
@@ -554,11 +614,14 @@ export class EventDetailComponent implements OnInit {
   bookingForm!: FormGroup;
   bookingLoading = false;
   isLoggedIn = false;
-  isOrganizer = false;  // NEW: Track if user is organizer
+  isOrganizer = false;
   enableSeatSelection = false;
   hasSeatMap = false;
   selectionDisabled = false;
   ticketOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  
+  // ✅ NEW: Expired event tracking
+  isExpired = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -584,49 +647,100 @@ export class EventDetailComponent implements OnInit {
     
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
-      this.eventService.getEventById(+id).subscribe({
-        next: (ev) => { 
-          this.event = ev; 
-          this.hasSeatMap = ev.seatConfig ? true : false;
-          this.loading = false;
-          
-          if (this.hasSeatMap) {
-            this.loadSeats();
-          }
-        },
-        error: () => { 
-          this.loading = false; 
-          this.router.navigate(['/']); 
-        }
-      });
+      this.loadEvent(+id);
     }
   }
 
-  // Helper method to generate Google Maps URL with proper error handling
+  /**
+   * ✅ UPDATED: Load event with expiry check
+   */
+  loadEvent(id: number): void {
+    this.loading = true;
+    this.eventService.getEventById(id).subscribe({
+      next: (event) => {
+        this.event = event;
+        this.hasSeatMap = event.seatConfig ? true : false;
+        
+        // ✅ CHECK IF EVENT IS EXPIRED
+        const now = new Date();
+        const endDate = new Date(event.endDateTime);
+        
+        if (endDate < now || event.status === 'Completed' || event.status === 'Cancelled') {
+          this.isExpired = true;
+          this.toastr.warning('This event has already ended', 'Event Expired', {
+            timeOut: 5000,
+            positionClass: 'toast-top-right'
+          });
+        } else {
+          this.isExpired = false;
+        }
+        
+        this.loading = false;
+        
+        if (this.hasSeatMap && !this.isExpired) {
+          this.loadSeats();
+        }
+      },
+      error: () => { 
+        this.loading = false; 
+        this.toastr.error('Event not found', 'Error');
+        this.router.navigate(['/']); 
+      }
+    });
+  }
+
+  /**
+   * ✅ NEW: Get time remaining for display
+   */
+  getTimeRemaining(): string {
+    if (!this.event || this.isExpired) return 'Ended';
+    
+    const end = new Date(this.event.endDateTime);
+    const now = new Date();
+    const diff = end.getTime() - now.getTime();
+
+    if (diff <= 0) return 'Ended';
+
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ${hours % 24}h remaining`;
+    if (hours > 0) return `${hours}h ${minutes % 60}m remaining`;
+    if (minutes > 0) return `${minutes}m remaining`;
+    return `${Math.floor(diff / 1000)}s remaining`;
+  }
+
+  /**
+   * Helper method to generate Google Maps URL with proper error handling
+   */
   getGoogleMapsUrl(): string {
     if (!this.event) return '#';
     
-    // If custom URL is provided and valid, use it
     if (this.event.googleMapsUrl && this.event.googleMapsUrl.startsWith('http')) {
       return this.event.googleMapsUrl;
     }
     
-    // Build search query from venue and city
     const searchQuery = `${this.event.venue}, ${this.event.city}`.trim();
     
-    // Fallback if query is empty
     if (!searchQuery || searchQuery.length < 3) {
       console.warn('Incomplete location data for event:', this.event.id);
       return '#';
     }
     
-    // Encode and return Google Maps URL
     const encodedQuery = encodeURIComponent(searchQuery);
     return `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
   }
 
-  // Method to handle seat toggle change
+  /**
+   * Method to handle seat toggle change
+   */
   onSeatToggleChange(enabled: boolean): void {
+    if (this.isExpired) {
+      this.toastr.warning('This event has ended. Seat selection is disabled.');
+      this.enableSeatSelection = false;
+      return;
+    }
     this.enableSeatSelection = enabled;
     if (enabled) {
       this.loadSeats();
@@ -634,7 +748,7 @@ export class EventDetailComponent implements OnInit {
   }
 
   loadSeats(): void {
-    if (!this.event) return;
+    if (!this.event || this.isExpired) return;
     this.loadingSeats = true;
     this.bookingService.getEventSeats(this.event.id).subscribe({
       next: (seats) => {
@@ -697,10 +811,16 @@ export class EventDetailComponent implements OnInit {
   }
 
   book(): void {
+    if (this.isExpired) {
+      this.toastr.error('This event has ended and cannot be booked.');
+      return;
+    }
+    
     if (this.bookingForm.invalid) { 
       this.bookingForm.markAllAsTouched(); 
       return; 
     }
+    
     this.bookingLoading = true;
     this.bookingService.createBooking({
       eventId: this.event!.id,
@@ -719,6 +839,11 @@ export class EventDetailComponent implements OnInit {
   }
 
   bookWithSeats(): void {
+    if (this.isExpired) {
+      this.toastr.error('This event has ended and cannot be booked.');
+      return;
+    }
+    
     if (this.selectedSeats.length === 0) {
       this.toastr.warning('Please select at least one seat.');
       return;

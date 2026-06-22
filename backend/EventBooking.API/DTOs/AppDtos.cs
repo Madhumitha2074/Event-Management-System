@@ -145,7 +145,7 @@ namespace EventBooking.API.DTOs
         public string City { get; set; } = string.Empty;
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
-        public string? ContactEmail { get; set; }  // ✅ ADDED
+        public string? ContactEmail { get; set; }
         public string? GoogleMapsUrl { get; set; }
         public decimal TicketPrice { get; set; }
         public decimal MinPrice { get; set; }
@@ -158,6 +158,11 @@ namespace EventBooking.API.DTOs
         public string CreatedAt { get; set; } = string.Empty;
         public bool HasSeatMap { get; set; }
         public string? SeatConfig { get; set; }
+
+        // ✅ NEW: Properties for expired event handling
+        public bool IsActive { get; set; }
+        public string? TimeRemaining { get; set; }
+        public bool IsEndingSoon { get; set; }
     }
 
     public class EventFilterDto
@@ -171,6 +176,13 @@ namespace EventBooking.API.DTOs
         public decimal? MaxPrice { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 9;
+
+        // ✅ NEW: Filter options for expired events
+        public bool IncludeExpired { get; set; } = false;
+        public bool OnlyActive { get; set; } = true;
+        public bool ShowLive { get; set; } = false;
+        public bool ShowEndingSoon { get; set; } = false;
+        public int EndingSoonThresholdMinutes { get; set; } = 15;
     }
 
     public class PagedResultDto<T>
@@ -180,6 +192,11 @@ namespace EventBooking.API.DTOs
         public int Page { get; set; }
         public int PageSize { get; set; }
         public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+
+        // ✅ NEW: Additional metadata
+        public int ActiveCount { get; set; }
+        public int ExpiredCount { get; set; }
+        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     }
 
     // ─────────────────────────────────────────────
@@ -300,5 +317,37 @@ namespace EventBooking.API.DTOs
         public string? FileName { get; set; }
         public long FileSize { get; set; }
         public string? ErrorMessage { get; set; }
+    }
+
+    // ─────────────────────────────────────────────
+    // ✅ NEW: EXPIRED EVENT DTOs
+    // ─────────────────────────────────────────────
+
+    public class ExpiredEventsCleanupResultDto
+    {
+        public int UpdatedCount { get; set; }
+        public List<int> EventIds { get; set; } = new();
+        public DateTime CleanupTime { get; set; } = DateTime.UtcNow;
+        public string? Message { get; set; }
+    }
+
+    public class EventsEndingSoonDto
+    {
+        public List<EventDto> Events { get; set; } = new();
+        public int Count => Events.Count;
+        public int ThresholdMinutes { get; set; }
+        public DateTime CheckedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    public class EventStatusSummaryDto
+    {
+        public int TotalEvents { get; set; }
+        public int ActiveEvents { get; set; }
+        public int UpcomingEvents { get; set; }
+        public int OngoingEvents { get; set; }
+        public int EndedEvents { get; set; }
+        public int CancelledEvents { get; set; }
+        public int EventsEndingSoon { get; set; }
+        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     }
 }

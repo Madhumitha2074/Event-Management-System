@@ -13,33 +13,47 @@ namespace EventBooking.API.Services
         Task<EventDto> UpdateEventAsync(int id, UpdateEventDto dto, int organizerId);
         Task DeleteEventAsync(int id, int organizerId);
         Task<List<EventDto>> GetOrganizerEventsAsync(int organizerId);
+
+        // Methods for handling expired events
+        Task<int> UpdateExpiredEventsAsync();
+        Task<List<EventDto>> GetEventsEndingSoonAsync(int thresholdMinutes = 15);
+        Task<PagedResultDto<EventDto>> GetActiveEventsAsync(EventFilterDto filter);
     }
 
     public class EventService : IEventService
     {
         private readonly DatabaseHelper _db;
+        private readonly ILogger<EventService>? _logger;
 
-        // ✅ Add this JsonSerializerOptions for camelCase serialization
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
 
-        // Category map — Angular sends int (0-7), DB stores string
         private static readonly string[] CategoryNames =
         {
             "Music", "Sports", "Technology", "Food",
             "Art",   "Business", "Health",   "Other"
         };
 
-        public EventService(DatabaseHelper db)
+        public EventService(DatabaseHelper db, ILogger<EventService>? logger = null)
         {
             _db = db;
+            _logger = logger;
         }
 
         // ─────────────────────────────────────────────
-        // GET ALL EVENTS  (with filters + pagination)
+        // GET ACTIVE EVENTS (explicitly filters expired)
+        // ─────────────────────────────────────────────
+        public async Task<PagedResultDto<EventDto>> GetActiveEventsAsync(EventFilterDto filter)
+        {
+            filter.OnlyActive = true;
+            return await GetEventsAsync(filter);
+        }
+
+        // ─────────────────────────────────────────────
+        // GET ALL EVENTS (with filters + pagination)
         // ─────────────────────────────────────────────
         public async Task<PagedResultDto<EventDto>> GetEventsAsync(EventFilterDto filter)
         {
@@ -50,7 +64,19 @@ namespace EventBooking.API.Services
             await connection.OpenAsync();
 
             // ── Build dynamic WHERE clause ──────────────────────────────
-            var conditions = new List<string> { "e.Status = 'Published'" };
+            var conditions = new List<string>();
+
+            // ✅ When showing expired, ONLY show expired events
+            if (filter.IncludeExpired)
+            {
+                conditions.Add("e.Status = 'Completed'");
+                conditions.Add("e.EndDateTime < GETUTCDATE()");
+            }
+            else
+            {
+                conditions.Add("e.Status = 'Published'");
+                conditions.Add("e.EndDateTime > GETUTCDATE()");
+            }
 
             var paramValues = new List<(string Name, object Value)>();
 
@@ -98,6 +124,12 @@ namespace EventBooking.API.Services
             {
                 conditions.Add("e.TicketPrice <= @MaxPrice");
                 paramValues.Add(("@MaxPrice", filter.MaxPrice.Value));
+            }
+
+            // ✅ Live events filter (only for active events, not expired)
+            if (filter.ShowLive && !filter.IncludeExpired)
+            {
+                conditions.Add("e.StartDateTime <= GETUTCDATE() AND e.EndDateTime >= GETUTCDATE()");
             }
 
             string whereClause = string.Join(" AND ", conditions);
@@ -158,7 +190,7 @@ namespace EventBooking.API.Services
                 FROM   Events e
                 INNER JOIN Users u ON e.OrganizerId = u.Id
                 WHERE  {whereClause}
-                ORDER  BY e.StartDateTime ASC
+                ORDER  BY e.StartDateTime DESC
                 OFFSET {offset} ROWS FETCH NEXT {filter.PageSize} ROWS ONLY";
 
             using (var dataCmd = new SqlCommand(dataQuery, connection))
@@ -244,20 +276,18 @@ namespace EventBooking.API.Services
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
-            
+
             using var transaction = connection.BeginTransaction();
 
             try
             {
-                // Calculate totals based on seat configuration
                 string? seatConfigJson = null;
                 int totalTickets = dto.TotalTickets;
                 decimal ticketPrice = dto.TicketPrice;
                 bool hasSeatMap = false;
-                
+
                 if (dto.SeatTiers != null && dto.SeatTiers.Any())
                 {
-                    // ✅ Use camelCase serialization
                     seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers, JsonOptions);
                     totalTickets = dto.SeatTiers.Sum(t => t.Rows * t.SeatsPerRow);
                     ticketPrice = dto.SeatTiers.Min(t => t.Price);
@@ -296,9 +326,9 @@ namespace EventBooking.API.Services
                 cmd.Parameters.AddWithValue("@TotalTickets", totalTickets);
                 cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
                 cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@GoogleMapsUrl", 
+                cmd.Parameters.AddWithValue("@GoogleMapsUrl",
                     string.IsNullOrWhiteSpace(dto.GoogleMapsUrl) ? (object)DBNull.Value : dto.GoogleMapsUrl.Trim());
-                cmd.Parameters.AddWithValue("@ContactEmail", 
+                cmd.Parameters.AddWithValue("@ContactEmail",
                     string.IsNullOrWhiteSpace(dto.ContactEmail) ? (object)DBNull.Value : dto.ContactEmail.Trim());
                 cmd.Parameters.AddWithValue("@HasSeatMap", hasSeatMap);
                 cmd.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow);
@@ -307,7 +337,6 @@ namespace EventBooking.API.Services
                 var scalar = await cmd.ExecuteScalarAsync();
                 int eventId = Convert.ToInt32(scalar);
 
-                // Generate seats if seat tiers are configured
                 if (dto.SeatTiers != null && dto.SeatTiers.Any())
                 {
                     var seatService = new SeatService(_db);
@@ -345,7 +374,6 @@ namespace EventBooking.API.Services
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            // Verify ownership first
             string ownerCheck = @"
                 SELECT COUNT(1) FROM Events
                 WHERE Id = @Id AND OrganizerId = @OrganizerId";
@@ -360,12 +388,10 @@ namespace EventBooking.API.Services
                     throw new UnauthorizedAccessException("You do not own this event.");
             }
 
-            // Calculate seat config if provided
             string? seatConfigJson = null;
             bool hasSeatMap = false;
             if (dto.SeatTiers != null && dto.SeatTiers.Any())
             {
-                // ✅ Use camelCase serialization
                 seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers, JsonOptions);
                 hasSeatMap = true;
             }
@@ -419,7 +445,6 @@ namespace EventBooking.API.Services
 
             await cmd.ExecuteNonQueryAsync();
 
-            // Regenerate seats if config changed and no bookings exist
             if (dto.SeatTiers != null && dto.SeatTiers.Any())
             {
                 var seatService = new SeatService(_db);
@@ -429,7 +454,7 @@ namespace EventBooking.API.Services
                 }
                 catch (InvalidOperationException ex)
                 {
-                    Console.WriteLine($"Warning: Could not regenerate seats: {ex.Message}");
+                    _logger?.LogWarning($"Could not regenerate seats: {ex.Message}");
                 }
             }
 
@@ -447,7 +472,6 @@ namespace EventBooking.API.Services
 
             try
             {
-                // Verify organizer owns the event
                 string ownerCheck = @"
                     SELECT COUNT(1) FROM Events
                     WHERE Id = @Id AND OrganizerId = @OrganizerId";
@@ -462,7 +486,6 @@ namespace EventBooking.API.Services
                         throw new UnauthorizedAccessException("You do not own this event.");
                 }
 
-                // Check if there are any confirmed bookings
                 string bookingCheck = @"
                     SELECT COUNT(1) FROM Bookings
                     WHERE EventId = @EventId AND Status IN ('Confirmed', 'Pending')";
@@ -471,7 +494,7 @@ namespace EventBooking.API.Services
                 {
                     checkBookingCmd.Parameters.AddWithValue("@EventId", id);
                     int activeBookings = Convert.ToInt32(await checkBookingCmd.ExecuteScalarAsync());
-                    
+
                     if (activeBookings > 0)
                     {
                         throw new InvalidOperationException(
@@ -479,20 +502,16 @@ namespace EventBooking.API.Services
                     }
                 }
 
-                // Delete in correct order to avoid foreign key conflicts
-                
-                // 1. Delete tickets
                 string deleteTicketsQuery = @"
                     DELETE FROM Tickets 
                     WHERE BookingId IN (SELECT Id FROM Bookings WHERE EventId = @EventId)";
-                
+
                 using (var cmd1 = new SqlCommand(deleteTicketsQuery, connection, transaction))
                 {
                     cmd1.Parameters.AddWithValue("@EventId", id);
                     await cmd1.ExecuteNonQueryAsync();
                 }
 
-                // 2. Delete event seats
                 string deleteSeatsQuery = "DELETE FROM EventSeats WHERE EventId = @EventId";
                 using (var cmd2 = new SqlCommand(deleteSeatsQuery, connection, transaction))
                 {
@@ -500,7 +519,6 @@ namespace EventBooking.API.Services
                     await cmd2.ExecuteNonQueryAsync();
                 }
 
-                // 3. Delete bookings
                 string deleteBookingsQuery = "DELETE FROM Bookings WHERE EventId = @EventId";
                 using (var cmd3 = new SqlCommand(deleteBookingsQuery, connection, transaction))
                 {
@@ -508,7 +526,6 @@ namespace EventBooking.API.Services
                     await cmd3.ExecuteNonQueryAsync();
                 }
 
-                // 4. Finally delete the event
                 string deleteEventQuery = "DELETE FROM Events WHERE Id = @Id AND OrganizerId = @OrganizerId";
                 using (var cmd4 = new SqlCommand(deleteEventQuery, connection, transaction))
                 {
@@ -578,6 +595,83 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
+        // UPDATE EXPIRED EVENTS
+        // ─────────────────────────────────────────────
+        public async Task<int> UpdateExpiredEventsAsync()
+        {
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            string query = @"
+                UPDATE Events 
+                SET Status = 'Completed', 
+                    UpdatedAt = GETUTCDATE()
+                WHERE EndDateTime < GETUTCDATE() 
+                AND Status NOT IN ('Completed', 'Cancelled')";
+
+            using var cmd = new SqlCommand(query, connection);
+            int updatedCount = await cmd.ExecuteNonQueryAsync();
+
+            if (updatedCount > 0)
+            {
+                _logger?.LogInformation($"Updated {updatedCount} expired events to 'Completed'");
+            }
+
+            return updatedCount;
+        }
+
+        // ─────────────────────────────────────────────
+        // GET EVENTS ENDING SOON
+        // ─────────────────────────────────────────────
+        public async Task<List<EventDto>> GetEventsEndingSoonAsync(int thresholdMinutes = 15)
+        {
+            var events = new List<EventDto>();
+
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            string query = @"
+                SELECT e.Id,
+                       e.Title,
+                       e.Description,
+                       e.Category,
+                       e.Status,
+                       e.StartDateTime,
+                       e.EndDateTime,
+                       e.Venue,
+                       e.City,
+                       e.Address,
+                       e.ImageUrl,
+                       e.ContactEmail,
+                       e.TicketPrice,
+                       e.TotalTickets,
+                       e.BookedTickets,
+                       (e.TotalTickets - e.BookedTickets) AS AvailableTickets,
+                       e.OrganizerId,
+                       e.CreatedAt,
+                       e.SeatConfig,
+                       e.GoogleMapsUrl,
+                       u.Name AS OrganizerName
+                FROM Events e
+                INNER JOIN Users u ON e.OrganizerId = u.Id
+                WHERE e.Status = 'Published'
+                AND e.EndDateTime > GETUTCDATE()
+                AND e.EndDateTime < DATEADD(MINUTE, @Threshold, GETUTCDATE())
+                ORDER BY e.EndDateTime ASC";
+
+            using var cmd = new SqlCommand(query, connection);
+            cmd.Parameters.AddWithValue("@Threshold", thresholdMinutes);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                events.Add(MapReaderToEventDto(reader));
+            }
+
+            return events;
+        }
+
+        // ─────────────────────────────────────────────
         // PRIVATE: Map SqlDataReader → EventDto
         // ─────────────────────────────────────────────
         private static EventDto MapReaderToEventDto(SqlDataReader reader)
@@ -590,11 +684,11 @@ namespace EventBooking.API.Services
             string? seatConfig = reader["SeatConfig"] == DBNull.Value ? null : reader["SeatConfig"].ToString();
             string? googleMapsUrl = reader["GoogleMapsUrl"] == DBNull.Value ? null : reader["GoogleMapsUrl"].ToString();
             string? contactEmail = reader["ContactEmail"] == DBNull.Value ? null : reader["ContactEmail"].ToString();
-            
+
             decimal ticketPrice = Convert.ToDecimal(reader["TicketPrice"]);
             decimal minPrice = ticketPrice;
             decimal maxPrice = ticketPrice;
-            
+
             if (!string.IsNullOrEmpty(seatConfig))
             {
                 try
@@ -628,6 +722,9 @@ namespace EventBooking.API.Services
                 }
             }
 
+            DateTime endDateTime = (DateTime)reader["EndDateTime"];
+            bool isActive = endDateTime > DateTime.UtcNow;
+
             return new EventDto
             {
                 Id = Convert.ToInt32(reader["Id"]),
@@ -637,7 +734,7 @@ namespace EventBooking.API.Services
                 CategoryIndex = categoryIndex,
                 Status = reader["Status"].ToString()!,
                 StartDateTime = ((DateTime)reader["StartDateTime"]).ToString("o"),
-                EndDateTime = ((DateTime)reader["EndDateTime"]).ToString("o"),
+                EndDateTime = endDateTime.ToString("o"),
                 Venue = reader["Venue"].ToString()!,
                 City = reader["City"].ToString()!,
                 Address = reader["Address"] == DBNull.Value ? null : reader["Address"].ToString(),
@@ -654,8 +751,33 @@ namespace EventBooking.API.Services
                 CreatedAt = ((DateTime)reader["CreatedAt"]).ToString("o"),
                 HasSeatMap = !string.IsNullOrEmpty(seatConfig),
                 SeatConfig = seatConfig,
-                GoogleMapsUrl = googleMapsUrl
+                GoogleMapsUrl = googleMapsUrl,
+                IsActive = isActive,
+                TimeRemaining = isActive ? GetTimeRemaining(endDateTime) : "Ended"
             };
+        }
+
+        // ─────────────────────────────────────────────
+        // PRIVATE: Helper to calculate time remaining
+        // ─────────────────────────────────────────────
+        private static string GetTimeRemaining(DateTime endDateTime)
+        {
+            var now = DateTime.UtcNow;
+            var diff = endDateTime - now;
+
+            if (diff.TotalSeconds <= 0)
+                return "Ended";
+
+            if (diff.TotalDays >= 1)
+                return $"{diff.Days}d {diff.Hours}h remaining";
+
+            if (diff.TotalHours >= 1)
+                return $"{diff.Hours}h {diff.Minutes}m remaining";
+
+            if (diff.TotalMinutes >= 1)
+                return $"{diff.Minutes}m {diff.Seconds}s remaining";
+
+            return $"{diff.Seconds}s remaining";
         }
     }
 }

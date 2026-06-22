@@ -51,6 +51,50 @@ namespace EventBooking.API.Controllers
         }
 
         // ─────────────────────────────────────────────
+        // GET api/events/active  (public — no auth needed)
+        // ─────────────────────────────────────────────
+        [HttpGet("active")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetActiveEvents([FromQuery] EventFilterDto filter)
+        {
+            try
+            {
+                filter.OnlyActive = true;
+                var result = await _eventService.GetEventsAsync(filter);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve active events");
+                return StatusCode(500, new { message = "Failed to retrieve active events.", detail = ex.Message });
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // GET api/events/ending-soon  (public — no auth needed)
+        // ─────────────────────────────────────────────
+        [HttpGet("ending-soon")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetEventsEndingSoon([FromQuery] int thresholdMinutes = 15)
+        {
+            try
+            {
+                var events = await _eventService.GetEventsEndingSoonAsync(thresholdMinutes);
+                return Ok(new EventsEndingSoonDto
+                {
+                    Events = events,
+                    ThresholdMinutes = thresholdMinutes,
+                    CheckedAt = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve events ending soon");
+                return StatusCode(500, new { message = "Failed to retrieve events ending soon.", detail = ex.Message });
+            }
+        }
+
+        // ─────────────────────────────────────────────
         // GET api/events/{id}  (public — no auth needed)
         // ─────────────────────────────────────────────
         [HttpGet("{id}")]
@@ -85,9 +129,12 @@ namespace EventBooking.API.Controllers
 
             try
             {
-                // Log the incoming data
                 _logger.LogInformation("📥 Creating event for user {OrganizerId}", organizerId);
-                _logger.LogInformation("📋 Event data: {@EventData}", dto);
+
+                if (DateTime.TryParse(dto.EndDateTime, out DateTime endDateTime) && endDateTime <= DateTime.UtcNow)
+                {
+                    return BadRequest(new { message = "End date must be in the future." });
+                }
 
                 if (dto.SeatTiers != null && dto.SeatTiers.Any())
                 {
@@ -111,7 +158,6 @@ namespace EventBooking.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "❌ Error creating event: {Message}", ex.Message);
-                _logger.LogError("📚 Stack trace: {StackTrace}", ex.StackTrace);
                 return StatusCode(500, new { message = "Failed to create event.", error = ex.Message });
             }
         }
@@ -129,6 +175,13 @@ namespace EventBooking.API.Controllers
             try
             {
                 _logger.LogInformation("📥 Updating event {EventId} for user {OrganizerId}", id, organizerId);
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (!existingEvent.IsActive && existingEvent.Status == "Completed")
+                {
+                    return BadRequest(new { message = "Cannot update an expired event." });
+                }
+
                 var ev = await _eventService.UpdateEventAsync(id, dto, organizerId);
                 _logger.LogInformation("✅ Event {EventId} updated successfully", id);
                 return Ok(ev);
@@ -186,6 +239,73 @@ namespace EventBooking.API.Controllers
         }
 
         // ─────────────────────────────────────────────
+        // POST api/events/cleanup-expired  (Admin only)
+        // ─────────────────────────────────────────────
+        [HttpPost("cleanup-expired")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> CleanupExpiredEvents()
+        {
+            try
+            {
+                _logger.LogInformation("🧹 Starting expired events cleanup");
+                var updatedCount = await _eventService.UpdateExpiredEventsAsync();
+                _logger.LogInformation("✅ Cleaned up {Count} expired events", updatedCount);
+
+                return Ok(new ExpiredEventsCleanupResultDto
+                {
+                    UpdatedCount = updatedCount,
+                    CleanupTime = DateTime.UtcNow,
+                    Message = $"Successfully marked {updatedCount} expired events as 'Completed'"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Failed to cleanup expired events");
+                return StatusCode(500, new { message = "Failed to cleanup expired events.", detail = ex.Message });
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // GET api/events/status-summary  (Admin/Owner)
+        // ─────────────────────────────────────────────
+        [HttpGet("status-summary")]
+        [Authorize(Roles = "Admin,Organizer")]
+        public async Task<IActionResult> GetStatusSummary()
+        {
+            try
+            {
+                var filter = new EventFilterDto
+                {
+                    IncludeExpired = true,
+                    Page = 1,
+                    PageSize = int.MaxValue
+                };
+
+                var result = await _eventService.GetEventsAsync(filter);
+                var allEvents = result.Items ?? new List<EventDto>();
+
+                var summary = new EventStatusSummaryDto
+                {
+                    TotalEvents = allEvents.Count,
+                    ActiveEvents = allEvents.Count(e => e.IsActive),
+                    UpcomingEvents = allEvents.Count(e => e.IsActive && DateTime.Parse(e.StartDateTime) > DateTime.UtcNow),
+                    OngoingEvents = allEvents.Count(e => e.IsActive && DateTime.Parse(e.StartDateTime) <= DateTime.UtcNow),
+                    EndedEvents = allEvents.Count(e => !e.IsActive && e.Status == "Completed"),
+                    CancelledEvents = allEvents.Count(e => e.Status == "Cancelled"),
+                    EventsEndingSoon = allEvents.Count(e => e.IsEndingSoon),
+                    LastUpdated = DateTime.UtcNow
+                };
+
+                return Ok(summary);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate status summary");
+                return StatusCode(500, new { message = "Failed to generate status summary.", detail = ex.Message });
+            }
+        }
+
+        // ─────────────────────────────────────────────
         // GET api/events/my-events  (Organizer or Admin)
         // ─────────────────────────────────────────────
         [HttpGet("my-events")]
@@ -237,8 +357,37 @@ namespace EventBooking.API.Controllers
             }
         }
 
+        // ─────────────────────────────────────────────
+        // GET api/events/{id}/seats
+        // ─────────────────────────────────────────────
+        [HttpGet("{id}/seats")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetEventSeats(int id)
+        {
+            try
+            {
+                var ev = await _eventService.GetEventByIdAsync(id);
+                if (!ev.IsActive)
+                {
+                    return BadRequest(new { message = "Cannot view seats for expired event." });
+                }
+
+                var seats = await _seatService.GetSeatsAsync(id);
+                return Ok(seats);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Event not found." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load seats for event {EventId}", id);
+                return StatusCode(500, new { message = "Failed to load seats.", detail = ex.Message });
+            }
+        }
+
         // ════════════════════════════════════════════════════════════════
-        // ✅ IMAGE UPLOAD ENDPOINTS
+        // IMAGE UPLOAD ENDPOINTS
         // ════════════════════════════════════════════════════════════════
 
         [HttpPost("upload-image")]
@@ -366,6 +515,47 @@ namespace EventBooking.API.Controllers
             userId = 0;
             var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return !string.IsNullOrWhiteSpace(claim) && int.TryParse(claim, out userId);
+        }
+
+        // ─────────────────────────────────────────────
+        // GET api/events/debug/check-expired  (Debug only)
+        // ─────────────────────────────────────────────
+        [HttpGet("debug/check-expired")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DebugCheckExpired()
+        {
+            try
+            {
+                var filter = new EventFilterDto
+                {
+                    IncludeExpired = true,
+                    Page = 1,
+                    PageSize = 100
+                };
+
+                var result = await _eventService.GetEventsAsync(filter);
+                var expiredEvents = result.Items?.Where(e => !e.IsActive).ToList() ?? new List<EventDto>();
+
+                return Ok(new
+                {
+                    TotalEvents = result.Items?.Count ?? 0,
+                    ExpiredEvents = expiredEvents.Count,
+                    ExpiredEventDetails = expiredEvents.Select(e => new
+                    {
+                        e.Id,
+                        e.Title,
+                        e.EndDateTime,
+                        e.Status,
+                        TimeAgo = DateTime.UtcNow - DateTime.Parse(e.EndDateTime)
+                    }),
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Debug check failed");
+                return StatusCode(500, new { message = "Debug check failed", detail = ex.Message });
+            }
         }
     }
 }

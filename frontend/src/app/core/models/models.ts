@@ -35,6 +35,9 @@ export interface LoginRequest {
   password: string;
 }
 
+// ============================================================
+// UPDATED: Event Interface with Expiry Properties
+// ============================================================
 export interface Event {
   id: number;
   title: string;
@@ -49,6 +52,7 @@ export interface Event {
   address?: string;
   imageUrl?: string;
   contactEmail?: string;
+  googleMapsUrl?: string;
   ticketPrice: number;
   minPrice?: number;
   maxPrice?: number; 
@@ -60,9 +64,16 @@ export interface Event {
   createdAt: string;
   seatConfig?: string; 
   hasSeatMap?: boolean;
-  googleMapsUrl?: string;
+  
+  // ✅ Expired event properties
+  isActive: boolean;
+  timeRemaining?: string;
+  isEndingSoon?: boolean;
 }
 
+// ============================================================
+// UPDATED: EventFilter Interface with Expiry & Live Filters
+// ============================================================
 export interface EventFilter {
   search?: string;
   city?: string;
@@ -73,20 +84,37 @@ export interface EventFilter {
   maxPrice?: number;
   page?: number;
   pageSize?: number;
+  
+  // ✅ Expiry filter options
+  includeExpired?: boolean;
+  onlyActive?: boolean;
+  showEndingSoon?: boolean;
+  endingSoonThresholdMinutes?: number;
+  
+  // ✅ NEW: Live events filter
+  showLive?: boolean;
 }
 
+// ============================================================
+// UPDATED: PagedResult Interface with Metadata
+// ============================================================
 export interface PagedResult<T> {
   items: T[];
   totalCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
+  
+  // ✅ Additional metadata
+  activeCount?: number;
+  expiredCount?: number;
+  lastUpdated?: string;
 }
 
 // ── Seat types ───────────────────────────────────────────────
  
-export type SeatTier = 'Premium' | 'Standard' | 'Economy';  // ✅ CHANGED from 'Ordinary' to 'Standard'
- 
+export type SeatTier = 'Premium' | 'Standard' | 'Economy';
+
 export interface EventSeat {
   id: number;
   seatNumber: string;
@@ -184,6 +212,53 @@ export const EVENT_CATEGORIES = [
 
 export const SEAT_TIER_COLORS: Record<SeatTier, { bg: string; text: string; border: string }> = {
   Premium:  { bg: '#ffd700', text: '#1a1200', border: '#b8960c' },
-  Standard: { bg: '#4f9eff', text: '#ffffff', border: '#2563eb' },  // ✅ CHANGED from 'Ordinary' to 'Standard'
+  Standard: { bg: '#4f9eff', text: '#ffffff', border: '#2563eb' },
   Economy:  { bg: '#6ee7b7', text: '#064e3b', border: '#059669' }
 };
+
+// ============================================================
+// ✅ NEW: Expired Event Related Interfaces
+// ============================================================
+
+/**
+ * Response from the cleanup endpoint
+ */
+export interface CleanupResponse {
+  updatedCount: number;
+  eventIds?: number[];
+  cleanupTime: string;
+  message: string;
+}
+
+/**
+ * Response for events ending soon
+ */
+export interface EventsEndingSoonResponse {
+  events: Event[];
+  thresholdMinutes: number;
+  checkedAt: string;
+}
+
+/**
+ * Event status summary for dashboard
+ */
+export interface EventStatusSummary {
+  totalEvents: number;
+  activeEvents: number;
+  upcomingEvents: number;
+  ongoingEvents: number;
+  endedEvents: number;
+  cancelledEvents: number;
+  eventsEndingSoon: number;
+  lastUpdated: string;
+}
+
+/**
+ * Result of expired events cleanup
+ */
+export interface ExpiredEventsCleanupResult {
+  updatedCount: number;
+  eventIds: number[];
+  cleanupTime: string;
+  message: string;
+}

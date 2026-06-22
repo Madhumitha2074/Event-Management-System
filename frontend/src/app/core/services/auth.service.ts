@@ -93,6 +93,8 @@ export class AuthService {
     this.router.navigate(['/auth/login']);
   }
 
+  // ============ Getters ============
+
   get currentUser(): AuthResponse | null {
     return this.currentUserSubject.value;
   }
@@ -108,6 +110,54 @@ export class AuthService {
   get token(): string | null {
     return this.currentUser?.token ?? null;
   }
+
+  /**
+   * ✅ NEW: Get the current user's role
+   * Returns 'Admin', 'Organizer', or 'User'
+   */
+  getRole(): string {
+    // First try to get from currentUser subject
+    if (this.currentUserSubject.value) {
+      return this.currentUserSubject.value.role || 'User';
+    }
+    
+    // Fallback: try to get from localStorage
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      try {
+        const user = JSON.parse(stored);
+        return user.role || 'User';
+      } catch (e) {
+        console.error('Error parsing stored user:', e);
+        return 'User';
+      }
+    }
+    
+    return 'User';
+  }
+
+  /**
+   * ✅ NEW: Check if user has a specific role
+   */
+  hasRole(role: string): boolean {
+    return this.getRole() === role;
+  }
+
+  /**
+   * ✅ NEW: Check if user is Admin
+   */
+  isAdmin(): boolean {
+    return this.getRole() === 'Admin';
+  }
+
+  /**
+   * ✅ NEW: Check if user is Organizer
+   */
+  isOrganizerOnly(): boolean {
+    return this.getRole() === 'Organizer';
+  }
+
+  // ============ City Selection Methods ============
 
   setSelectedCity(city: string): void {
     localStorage.setItem('selected_city', city);
@@ -126,6 +176,8 @@ export class AuthService {
   hasSelectedCity(): boolean {
     return this.getStoredCity() !== null;
   }
+
+  // ============ Private Helper Methods ============
 
   private getStoredCity(): string | null {
     return localStorage.getItem('selected_city');
