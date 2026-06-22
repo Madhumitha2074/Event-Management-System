@@ -11,6 +11,8 @@ import { NavbarComponent } from './navbar/navbar.component';
 import { ImageUploadComponent } from './components/image-upload/image-upload.component';
 import { SeatConfigComponent } from './components/seat-config/seat-config.component';
 
+import { ConfirmationDialogComponent } from './components/confirmation-dialog/confirmation-dialog.component'; // ✅ ADD
+
 // Standalone Component - IMPORT not DECLARE
 import { LocationSelectorComponent } from './location-selector/location-selector.component';
 
@@ -20,7 +22,8 @@ import { LocationSelectorComponent } from './location-selector/location-selector
     FooterComponent,
     NavbarComponent,
     ImageUploadComponent,
-    SeatConfigComponent
+    SeatConfigComponent,
+    ConfirmationDialogComponent
     
     // ❌ LocationSelectorComponent is NOT here - it's standalone
   ],
@@ -38,7 +41,7 @@ import { LocationSelectorComponent } from './location-selector/location-selector
     ImageUploadComponent,
     SeatConfigComponent,
     LocationSelectorComponent,  // ← Export standalone component
-    
+    ConfirmationDialogComponent,
     // Export common modules
     CommonModule,
     FormsModule,

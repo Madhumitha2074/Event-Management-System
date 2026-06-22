@@ -15,8 +15,6 @@ namespace EventBooking.API.Services
         Task<List<BookingDto>> GetEventBookingsAsync(int eventId, int organizerId);
         Task<byte[]> GenerateBookingPdfAsync(int bookingId, int userId);
         Task<TicketVerificationDto> VerifyTicketAsync(string qrData);
-        
-        // ✅ ADD THIS METHOD
         Task<bool> HasBookingsAsync(int eventId);
     }
 
@@ -38,13 +36,23 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // CREATE BOOKING  (Transaction — most critical)
+        // CREATE BOOKING (Transaction — most critical)
         // ─────────────────────────────────────────────
         public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int userId)
         {
             // Validate attendees count matches ticket count
             if (dto.Attendees == null || dto.Attendees.Count != dto.TicketCount)
                 throw new ArgumentException("Number of attendees must match ticket count.");
+
+            // Validate each attendee has required contact info
+            foreach (var attendee in dto.Attendees)
+            {
+                if (attendee.ContactMethod == "email" && string.IsNullOrWhiteSpace(attendee.Email))
+                    throw new ArgumentException($"Email is required for attendee {attendee.Name}.");
+                
+                if (attendee.ContactMethod == "phone" && string.IsNullOrWhiteSpace(attendee.Phone))
+                    throw new ArgumentException($"Phone number is required for attendee {attendee.Name}.");
+            }
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
@@ -60,10 +68,11 @@ namespace EventBooking.API.Services
                 string eventTitle;
                 string eventVenue;
                 string eventStartDateTime;
+                bool hasSeatMap;
 
                 string eventQuery = @"
                     SELECT TicketPrice, (TotalTickets - BookedTickets) AS AvailableTickets,
-                           Title, Venue, StartDateTime
+                           Title, Venue, StartDateTime, HasSeatMap
                     FROM   Events
                     WHERE  Id = @EventId AND Status = 'Published'";
 
@@ -81,6 +90,14 @@ namespace EventBooking.API.Services
                     eventTitle = eventReader["Title"].ToString()!;
                     eventVenue = eventReader["Venue"].ToString()!;
                     eventStartDateTime = ((DateTime)eventReader["StartDateTime"]).ToString("o");
+                    hasSeatMap = Convert.ToBoolean(eventReader["HasSeatMap"]);
+                }
+
+                // ✅ Check if event has seat map - prevent traditional booking
+                if (hasSeatMap)
+                {
+                    throw new InvalidOperationException(
+                        "This event requires seat selection. Please use the seat map to book specific seats.");
                 }
 
                 // ✅ Check availability BEFORE booking
@@ -119,40 +136,44 @@ namespace EventBooking.API.Services
                 foreach (var attendee in dto.Attendees)
                 {
                     string ticketNumber = GenerateTicketNumber();
+                    
+                    // ✅ Use email or phone as contact identifier
+                    string contactIdentifier = attendee.ContactMethod == "email" 
+                        ? attendee.Email ?? attendee.Phone ?? "no-contact" 
+                        : attendee.Phone ?? attendee.Email ?? "no-contact";
 
                     string insertTicketQuery = @"
                         INSERT INTO Tickets
-                            (TicketNumber, BookingId, AttendeeName, AttendeeEmail)
+                            (TicketNumber, BookingId, AttendeeName, AttendeeEmail, AttendeePhone, ContactMethod)
                         OUTPUT INSERTED.Id
                         VALUES
-                            (@TicketNumber, @BookingId, @AttendeeName, @AttendeeEmail)";
+                            (@TicketNumber, @BookingId, @AttendeeName, @AttendeeEmail, @AttendeePhone, @ContactMethod)";
 
                     using var ticketCmd = new SqlCommand(insertTicketQuery, connection, transaction);
 
                     ticketCmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
                     ticketCmd.Parameters.AddWithValue("@BookingId", bookingId);
                     ticketCmd.Parameters.AddWithValue("@AttendeeName", attendee.Name.Trim());
-                    ticketCmd.Parameters.AddWithValue("@AttendeeEmail", attendee.Email.Trim().ToLower());
+                    ticketCmd.Parameters.AddWithValue("@AttendeeEmail", attendee.Email ?? (object)DBNull.Value);
+                    ticketCmd.Parameters.AddWithValue("@AttendeePhone", attendee.Phone ?? (object)DBNull.Value);
+                    ticketCmd.Parameters.AddWithValue("@ContactMethod", attendee.ContactMethod);
 
                     var ticketScalar = await ticketCmd.ExecuteScalarAsync();
                     int ticketId = Convert.ToInt32(ticketScalar);
 
-                    // FIXED: Generate QR code with proper null handling
-                    string ticketData = $"{ticketNumber}|{bookingId}|{attendee.Email.Trim().ToLower()}";
+                    // Generate QR code with contact identifier
+                    string ticketData = $"{ticketNumber}|{bookingId}|{contactIdentifier}";
                     byte[]? qrCodeBytes = _qrCodeService.GenerateQrCodeBytes(ticketData);
-                    string? qrCodeBase64 = null;
-
-                    if (qrCodeBytes != null)
-                    {
-                        qrCodeBase64 = Convert.ToBase64String(qrCodeBytes);
-                    }
+                    string? qrCodeBase64 = qrCodeBytes != null ? Convert.ToBase64String(qrCodeBytes) : null;
 
                     ticketDtos.Add(new TicketDto
                     {
                         Id = ticketId,
                         TicketNumber = ticketNumber,
                         AttendeeName = attendee.Name.Trim(),
-                        AttendeeEmail = attendee.Email.Trim().ToLower(),
+                        AttendeeEmail = attendee.Email ?? string.Empty,
+                        AttendeePhone = attendee.Phone ?? string.Empty,
+                        ContactMethod = attendee.ContactMethod,
                         IsUsed = false,
                         QrCodeBase64 = qrCodeBase64,
                         QrCodeBytes = qrCodeBytes
@@ -210,6 +231,16 @@ namespace EventBooking.API.Services
             if (dto.Attendees == null || dto.Attendees.Count != dto.SeatIds.Count)
                 throw new ArgumentException("Number of attendees must match number of seats selected.");
 
+            // Validate each attendee has required contact info
+            foreach (var attendee in dto.Attendees)
+            {
+                if (attendee.ContactMethod == "email" && string.IsNullOrWhiteSpace(attendee.Email))
+                    throw new ArgumentException($"Email is required for attendee {attendee.Name}.");
+                
+                if (attendee.ContactMethod == "phone" && string.IsNullOrWhiteSpace(attendee.Phone))
+                    throw new ArgumentException($"Phone number is required for attendee {attendee.Name}.");
+            }
+
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
@@ -221,11 +252,14 @@ namespace EventBooking.API.Services
                 var attendeesWithSeatIds = new List<object>();
                 for (int i = 0; i < dto.SeatIds.Count; i++)
                 {
+                    var attendee = dto.Attendees[i];
                     attendeesWithSeatIds.Add(new
                     {
                         seatId = dto.SeatIds[i],
-                        name = dto.Attendees[i].Name.Trim(),
-                        email = dto.Attendees[i].Email.Trim().ToLower()
+                        name = attendee.Name.Trim(),
+                        email = attendee.Email?.Trim().ToLower() ?? string.Empty,
+                        phone = attendee.Phone?.Trim() ?? string.Empty,
+                        contactMethod = attendee.ContactMethod
                     });
                 }
                 string attendeesJson = System.Text.Json.JsonSerializer.Serialize(attendeesWithSeatIds);
@@ -368,7 +402,8 @@ namespace EventBooking.API.Services
 
             // ── Load Tickets with QR codes for this booking ─────────────────
             string ticketQuery = @"
-                SELECT Id, TicketNumber, AttendeeName, AttendeeEmail, IsUsed
+                SELECT Id, TicketNumber, AttendeeName, AttendeeEmail, 
+                       AttendeePhone, ContactMethod, IsUsed
                 FROM   Tickets
                 WHERE  BookingId = @BookingId";
 
@@ -382,9 +417,16 @@ namespace EventBooking.API.Services
                 {
                     string ticketNumber = ticketReader["TicketNumber"].ToString()!;
                     string attendeeEmail = ticketReader["AttendeeEmail"].ToString()!;
-                    string ticketData = $"{ticketNumber}|{id}|{attendeeEmail}";
+                    string attendeePhone = ticketReader["AttendeePhone"]?.ToString() ?? string.Empty;
+                    string contactMethod = ticketReader["ContactMethod"].ToString() ?? "email";
                     
-                    // FIXED: Add null check
+                    // Use appropriate contact identifier for QR code
+                    string contactIdentifier = contactMethod == "email" 
+                        ? attendeeEmail 
+                        : attendeePhone;
+                    
+                    string ticketData = $"{ticketNumber}|{id}|{contactIdentifier}";
+                    
                     byte[]? qrCodeBytes = _qrCodeService.GenerateQrCodeBytes(ticketData);
                     string? qrCodeBase64 = null;
                     
@@ -399,6 +441,8 @@ namespace EventBooking.API.Services
                         TicketNumber = ticketNumber,
                         AttendeeName = ticketReader["AttendeeName"].ToString()!,
                         AttendeeEmail = attendeeEmail,
+                        AttendeePhone = attendeePhone,
+                        ContactMethod = contactMethod,
                         IsUsed = Convert.ToBoolean(ticketReader["IsUsed"]),
                         QrCodeBase64 = qrCodeBase64,
                         QrCodeBytes = qrCodeBytes
@@ -418,7 +462,8 @@ namespace EventBooking.API.Services
 
             string ticketQuery = @"
                 SELECT t.Id, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, 
-                       t.IsUsed, t.SeatId, es.SeatNumber, es.Tier, es.Price
+                       t.AttendeePhone, t.ContactMethod, t.IsUsed, 
+                       t.SeatId, es.SeatNumber, es.Tier, es.Price
                 FROM Tickets t
                 LEFT JOIN EventSeats es ON t.SeatId = es.Id
                 WHERE t.BookingId = @BookingId";
@@ -433,6 +478,13 @@ namespace EventBooking.API.Services
                     {
                         string ticketNumber = reader["TicketNumber"].ToString()!;
                         string attendeeEmail = reader["AttendeeEmail"].ToString()!;
+                        string attendeePhone = reader["AttendeePhone"]?.ToString() ?? string.Empty;
+                        string contactMethod = reader["ContactMethod"].ToString() ?? "email";
+                        
+                        // Use appropriate contact identifier for QR code
+                        string contactIdentifier = contactMethod == "email" 
+                            ? attendeeEmail 
+                            : attendeePhone;
                         
                         byte[]? qrCodeBytes = null;
                         string? qrCodeBase64 = null;
@@ -440,10 +492,9 @@ namespace EventBooking.API.Services
                         try
                         {
                             // Generate QR code for each ticket
-                            string ticketData = $"{ticketNumber}|{bookingId}|{attendeeEmail}";
+                            string ticketData = $"{ticketNumber}|{bookingId}|{contactIdentifier}";
                             qrCodeBytes = _qrCodeService.GenerateQrCodeBytes(ticketData);
                             
-                            // FIXED: Add null check before converting
                             if (qrCodeBytes != null)
                             {
                                 qrCodeBase64 = Convert.ToBase64String(qrCodeBytes);
@@ -466,6 +517,8 @@ namespace EventBooking.API.Services
                             TicketNumber = ticketNumber,
                             AttendeeName = reader["AttendeeName"].ToString()!,
                             AttendeeEmail = attendeeEmail,
+                            AttendeePhone = attendeePhone,
+                            ContactMethod = contactMethod,
                             IsUsed = Convert.ToBoolean(reader["IsUsed"]),
                             QrCodeBase64 = qrCodeBase64,
                             QrCodeBytes = qrCodeBytes
@@ -575,7 +628,7 @@ namespace EventBooking.API.Services
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            //  Verify organizer owns the event before returning data
+            // Verify organizer owns the event before returning data
             string ownerCheck = @"
                 SELECT COUNT(1) FROM Events
                 WHERE Id = @EventId AND OrganizerId = @OrganizerId";
@@ -596,7 +649,8 @@ namespace EventBooking.API.Services
                        b.TicketCount, b.TotalAmount, b.Status, b.BookedAt,
                        e.Title AS EventTitle, e.Venue AS EventVenue,
                        e.StartDateTime AS EventStartDateTime,
-                       t.Id AS TicketId, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, t.IsUsed
+                       t.Id AS TicketId, t.TicketNumber, t.AttendeeName, 
+                       t.AttendeeEmail, t.AttendeePhone, t.ContactMethod, t.IsUsed
                 FROM Bookings b
                 INNER JOIN Events e ON b.EventId = e.Id
                 LEFT JOIN Tickets t ON b.Id = t.BookingId
@@ -641,6 +695,8 @@ namespace EventBooking.API.Services
                         TicketNumber = reader["TicketNumber"].ToString()!,
                         AttendeeName = reader["AttendeeName"].ToString()!,
                         AttendeeEmail = reader["AttendeeEmail"].ToString()!,
+                        AttendeePhone = reader["AttendeePhone"]?.ToString() ?? string.Empty,
+                        ContactMethod = reader["ContactMethod"].ToString() ?? "email",
                         IsUsed = Convert.ToBoolean(reader["IsUsed"])
                     });
                 }
@@ -659,7 +715,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // ✅ CHECK IF EVENT HAS BOOKINGS
+        // CHECK IF EVENT HAS BOOKINGS
         // ─────────────────────────────────────────────
         public async Task<bool> HasBookingsAsync(int eventId)
         {
@@ -684,32 +740,35 @@ namespace EventBooking.API.Services
         // ─────────────────────────────────────────────
         public async Task<TicketVerificationDto> VerifyTicketAsync(string qrData)
         {
-            // Parse QR data (format: "TKT-XXXX|BookingId|Email")
+            // Parse QR data (format: "TKT-XXXX|BookingId|ContactIdentifier")
             var parts = qrData.Split('|');
             if (parts.Length < 3)
-                throw new ArgumentException("Invalid QR code data. Expected format: TicketNumber|BookingId|Email");
+                throw new ArgumentException("Invalid QR code data. Expected format: TicketNumber|BookingId|ContactIdentifier");
 
             string ticketNumber = parts[0];
             if (!int.TryParse(parts[1], out int bookingId))
                 throw new ArgumentException("Invalid Booking ID in QR code");
 
-            string email = parts[2];
+            string contactIdentifier = parts[2];
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
+            // Check both email and phone for verification
             string query = @"
-                SELECT t.Id, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, t.IsUsed,
+                SELECT t.Id, t.TicketNumber, t.AttendeeName, t.AttendeeEmail, 
+                       t.AttendeePhone, t.ContactMethod, t.IsUsed,
                        b.EventId, e.Title as EventTitle, e.Venue, e.City,
                        b.BookingReference
                 FROM Tickets t
                 INNER JOIN Bookings b ON t.BookingId = b.Id
                 INNER JOIN Events e ON b.EventId = e.Id
-                WHERE t.TicketNumber = @TicketNumber AND t.AttendeeEmail = @Email";
+                WHERE t.TicketNumber = @TicketNumber 
+                AND (t.AttendeeEmail = @ContactIdentifier OR t.AttendeePhone = @ContactIdentifier)";
 
             using var cmd = new SqlCommand(query, connection);
             cmd.Parameters.AddWithValue("@TicketNumber", ticketNumber);
-            cmd.Parameters.AddWithValue("@Email", email);
+            cmd.Parameters.AddWithValue("@ContactIdentifier", contactIdentifier);
 
             using var reader = await cmd.ExecuteReaderAsync();
             
@@ -723,6 +782,8 @@ namespace EventBooking.API.Services
                 TicketNumber = ticketNumber,
                 AttendeeName = reader["AttendeeName"].ToString()!,
                 AttendeeEmail = reader["AttendeeEmail"].ToString()!,
+                AttendeePhone = reader["AttendeePhone"]?.ToString() ?? string.Empty,
+                ContactMethod = reader["ContactMethod"].ToString() ?? "email",
                 EventTitle = reader["EventTitle"].ToString()!,
                 Venue = reader["Venue"].ToString()!,
                 City = reader["City"].ToString()!,
@@ -755,6 +816,8 @@ namespace EventBooking.API.Services
         public string TicketNumber { get; set; } = string.Empty;
         public string AttendeeName { get; set; } = string.Empty;
         public string AttendeeEmail { get; set; } = string.Empty;
+        public string AttendeePhone { get; set; } = string.Empty;
+        public string ContactMethod { get; set; } = "email";
         public string EventTitle { get; set; } = string.Empty;
         public string Venue { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;

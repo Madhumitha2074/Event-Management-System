@@ -18,6 +18,9 @@ import { Router } from '@angular/router';
       (citySelected)="onCitySelected($event)"
       (closed)="onLocationPopupClosed()">
     </app-location-selector>
+
+    <!-- ✅ Confirmation Dialog - Always rendered -->
+    <app-confirmation-dialog></app-confirmation-dialog>
   `
 })
 export class AppComponent implements OnInit {

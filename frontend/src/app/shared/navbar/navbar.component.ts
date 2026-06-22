@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
 import { AuthResponse } from '../../core/models/models';
 import { LocationPopupService } from '../../core/services/location-popup.service';
+import { ConfirmationService } from '../../core/services/confirmation.service';
 
 @Component({
   selector: 'app-navbar',
@@ -110,6 +111,7 @@ import { LocationPopupService } from '../../core/services/location-popup.service
 
                   <li><hr class="dropdown-divider"></li>
 
+                  <!-- ✅ UPDATED: Logout with confirmation -->
                   <li>
                     <a class="dropdown-item text-danger" (click)="logout()">
                       <i class="fas fa-sign-out-alt me-2"></i>Logout
@@ -135,39 +137,59 @@ export class NavbarComponent implements OnInit {
 
   constructor(
     private authService: AuthService,
-    private locationPopupService: LocationPopupService
+    private locationPopupService: LocationPopupService,
+    private confirmationService: ConfirmationService
   ) {}
 
   ngOnInit(): void {
+    // Subscribe to auth state
     this.authService.currentUser$.subscribe(user => {
       this.currentUser = user;
       this.isLoggedIn = !!user;
       this.isOrganizer = user?.role === 'Organizer' || user?.role === 'Admin';
       this.isRegularUser = user?.role === 'User';
+      console.log('🔐 Navbar: User role updated:', user?.role);
     });
 
     // Subscribe to selected city changes
     this.authService.selectedCity$.subscribe(city => {
       this.selectedCity = city;
+      console.log('📍 Navbar: City updated:', city);
     });
   }
 
-  // Method to open location popup
+  /**
+   * Open location popup for city selection
+   */
   openLocationPopup(): void {
-    // First clear the selected city to show the popup with no selection
-    // Comment this line if you want to keep the current selection when reopening
-    // this.authService.clearSelectedCity();
-    
-    // Show the location popup
     this.locationPopupService.show();
   }
 
-  // Method to change city (alias for openLocationPopup)
+  /**
+   * Change city (alias for openLocationPopup)
+   */
   changeCity(): void {
     this.openLocationPopup();
   }
 
+  /**
+   * ✅ UPDATED: Logout with custom confirmation dialog
+   * Uses the enhanced logoutWithConfirmation method from AuthService
+   */
   logout(): void {
-    this.authService.logout();
+    console.log('🔄 Navbar: Logout initiated');
+    
+    this.authService.logoutWithConfirmation(this.confirmationService).subscribe({
+      next: (result) => {
+        if (result === true) {
+          console.log('✅ Navbar: User logged out successfully');
+        } else {
+          console.log('❌ Navbar: User cancelled logout');
+        }
+      },
+      error: (err) => {
+        console.error('❌ Navbar: Logout error:', err);
+      }
+    });
   }
 }

@@ -173,11 +173,14 @@ export interface Booking {
   tickets: Ticket[];
 }
 
+// ✅ UPDATED: Ticket Interface with Phone Support
 export interface Ticket {
   id: number;
   ticketNumber: string;
   attendeeName: string;
   attendeeEmail: string;
+  attendeePhone?: string;      // ✅ Added phone
+  contactMethod?: string;      // ✅ Added contact method
   isUsed: boolean;
   seatNumber?: string;
   tier?: string;
@@ -185,18 +188,28 @@ export interface Ticket {
   seatId?: number;
 }
 
-// NEW — booking request with seats
+// ✅ UPDATED: Booking request with seats - Email OR Phone support
 export interface CreateBookingWithSeatsRequest {
   eventId: number;
   seatIds: number[];
-  attendees: { name: string; email: string }[];
+  attendees: { 
+    name: string; 
+    email?: string | null;      // ✅ Made optional
+    phone?: string | null;      // ✅ Added phone
+    contactMethod: 'email' | 'phone';  // ✅ Added contactMethod
+  }[];
 }
  
-// ── Legacy flat booking ──────────────────────────────────────
+// ✅ UPDATED: Legacy flat booking - Email OR Phone support
 export interface CreateBookingRequest {
   eventId: number;
   ticketCount: number;
-  attendees: { name: string; email: string }[];
+  attendees: { 
+    name: string; 
+    email?: string | null;      // ✅ Made optional
+    phone?: string | null;      // ✅ Added phone
+    contactMethod: 'email' | 'phone';  // ✅ Added contactMethod
+  }[];
 }
 
 export const EVENT_CATEGORIES = [

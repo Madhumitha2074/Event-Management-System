@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { EventService } from '../../../core/services/event.service';
 import { Event } from '../../../core/models/models';
 import { ToastrService } from 'ngx-toastr';
+import { ConfirmationService } from '../../../core/services/confirmation.service';
 
 @Component({
   selector: 'app-organizer-dashboard',
@@ -530,22 +531,26 @@ export class OrganizerDashboardComponent implements OnInit {
   showRevenueModal = false;
   showBookingsModal = false;
 
-  constructor(private eventService: EventService, private toastr: ToastrService) {}
+  constructor(
+    private eventService: EventService,
+    private toastr: ToastrService,
+    private confirmationService: ConfirmationService  // ✅ ADDED
+  ) {}
 
-  ngOnInit(): void { 
-    this.loadEvents(); 
+  ngOnInit(): void {
+    this.loadEvents();
   }
 
   loadEvents(): void {
     this.loading = true;
     this.eventService.getMyEvents().subscribe({
-      next: (e) => { 
-        this.events = e; 
+      next: (e) => {
+        this.events = e;
         this.filteredEvents = e;
-        this.loading = false; 
+        this.loading = false;
       },
-      error: () => { 
-        this.loading = false; 
+      error: () => {
+        this.loading = false;
         this.toastr.error('Failed to load events');
       }
     });
@@ -585,49 +590,60 @@ export class OrganizerDashboardComponent implements OnInit {
     this.showRevenueModal = false;
   }
 
-  get publishedCount(): number { 
-    return this.events.filter(e => e.status === 'Published').length; 
-  }
-  
-  get totalBookings(): number { 
-    return this.events.reduce((s, e) => s + e.bookedTickets, 0); 
-  }
-  
-  get totalRevenue(): number { 
-    return this.events.reduce((s, e) => s + (e.bookedTickets * e.ticketPrice), 0); 
+  get publishedCount(): number {
+    return this.events.filter(e => e.status === 'Published').length;
   }
 
+  get totalBookings(): number {
+    return this.events.reduce((s, e) => s + e.bookedTickets, 0);
+  }
+
+  get totalRevenue(): number {
+    return this.events.reduce((s, e) => s + (e.bookedTickets * e.ticketPrice), 0);
+  }
+
+  /**
+   * ✅ UPDATED: Delete event with custom confirmation dialog
+   */
   deleteEvent(id: number): void {
     const eventToDelete = this.events.find(e => e.id === id);
     const eventTitle = eventToDelete?.title || 'this event';
-    
-    const confirmMessage = `⚠️ DELETE EVENT: "${eventTitle}"\n\n` +
-      `This will permanently delete:\n` +
-      `• All seat configurations\n` +
-      `• All bookings and tickets\n` +
-      `• All event data\n\n` +
-      `This action cannot be undone!\n\n` +
-      `Are you sure you want to delete this event?`;
-    
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-    
+
+    this.confirmationService.confirm({
+      title: '⚠️ Delete Event',
+      message: `Are you sure you want to delete "${eventTitle}"?\n\nThis will permanently delete:\n• All seat configurations\n• All bookings and tickets\n• All event data\n\nThis action cannot be undone!`,
+      confirmText: 'Yes, Delete Event',
+      cancelText: 'Cancel',
+      confirmButtonClass: 'btn-danger',
+      icon: 'fas fa-trash-alt'
+    }).subscribe({
+      next: (confirmed) => {
+        if (confirmed) {
+          this.processDeletion(id, eventTitle);
+        }
+      }
+    });
+  }
+
+  /**
+   * Process the actual deletion
+   */
+  private processDeletion(id: number, eventTitle: string): void {
     this.eventService.deleteEvent(id).subscribe({
-      next: () => { 
+      next: () => {
         this.toastr.success(`Event "${eventTitle}" deleted successfully!`, 'Success');
-        this.loadEvents(); 
+        this.loadEvents();
       },
-      error: (err) => { 
+      error: (err) => {
         console.error('Delete error:', err);
         let errorMsg = 'Could not delete event.';
-        
+
         if (err.error?.message) {
           errorMsg = err.error.message;
         } else if (err.message) {
           errorMsg = err.message;
         }
-        
+
         this.toastr.error(errorMsg, 'Delete Failed');
       }
     });

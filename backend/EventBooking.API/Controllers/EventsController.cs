@@ -451,34 +451,9 @@ namespace EventBooking.API.Controllers
             }
         }
 
-        // ─────────────────────────────────────────────
-        // GET api/events/{id}/seats
-        // ─────────────────────────────────────────────
-        [HttpGet("{id}/seats")]
-        [AllowAnonymous]
-        public async Task<IActionResult> GetEventSeats(int id)
-        {
-            try
-            {
-                var ev = await _eventService.GetEventByIdAsync(id);
-                if (!ev.IsActive)
-                {
-                    return BadRequest(new { message = "Cannot view seats for expired event." });
-                }
-
-                var seats = await _seatService.GetSeatsAsync(id);
-                return Ok(seats);
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound(new { message = "Event not found." });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to load seats for event {EventId}", id);
-                return StatusCode(500, new { message = "Failed to load seats.", detail = ex.Message });
-            }
-        }
+        // ❌ REMOVED: GET api/events/{id}/seats
+        // This endpoint is now handled by SeatsController
+        // to avoid AmbiguousMatchException
 
         // ════════════════════════════════════════════════════════════════
         // IMAGE UPLOAD ENDPOINTS

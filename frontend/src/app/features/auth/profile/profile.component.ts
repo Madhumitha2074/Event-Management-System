@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { EventService } from '../../../core/services/event.service';
 import { ToastrService } from 'ngx-toastr';
+import { ConfirmationService } from '../../../core/services/confirmation.service';
 
 @Component({
   selector: 'app-profile',
@@ -78,7 +79,6 @@ import { ToastrService } from 'ngx-toastr';
                     <i class="fas fa-chart-line text-primary me-2"></i>Organizer Dashboard
                   </h6>
                   
-                  <!-- Stats Cards -->
                   <div class="row g-2 mb-3">
                     <div class="col-6">
                       <div class="card bg-light border-0 text-center p-2">
@@ -111,7 +111,7 @@ import { ToastrService } from 'ngx-toastr';
 
               <hr>
 
-              <!-- Action Buttons - Different for Organizer and User -->
+              <!-- Action Buttons -->
               <div class="d-grid gap-2">
                 <!-- For Regular Users -->
                 <ng-container *ngIf="profile.role === 'User'">
@@ -127,6 +127,7 @@ import { ToastrService } from 'ngx-toastr';
                   </a>
                 </ng-container>
 
+                <!-- ✅ UPDATED: Logout with confirmation -->
                 <button class="btn btn-outline-danger" (click)="logout()">
                   <i class="fas fa-sign-out-alt me-2"></i>Logout
                 </button>
@@ -161,7 +162,8 @@ export class ProfileComponent implements OnInit {
   constructor(
     private authService: AuthService,
     private eventService: EventService,
-    private toastr: ToastrService
+    private toastr: ToastrService,
+    private confirmationService: ConfirmationService
   ) {}
 
   ngOnInit(): void {
@@ -196,7 +198,29 @@ export class ProfileComponent implements OnInit {
     });
   }
 
+  /**
+   * ✅ UPDATED: Logout with custom confirmation dialog
+   */
   logout(): void {
-    this.authService.logout();
+    this.confirmationService.confirm({
+      title: 'Logout Confirmation',
+      message: 'Are you sure you want to logout?\n\nYou will need to login again to access your bookings and profile.',
+      confirmText: 'Yes, Logout',
+      cancelText: 'Cancel',
+      confirmButtonClass: 'btn-danger',
+      icon: 'fas fa-sign-out-alt'
+    }).subscribe({
+      next: (confirmed) => {
+        if (confirmed) {
+          console.log('✅ User confirmed logout from profile');
+          this.authService.performLogout();
+        } else {
+          console.log('❌ User cancelled logout from profile');
+        }
+      },
+      error: (err) => {
+        console.error('❌ Logout confirmation error:', err);
+      }
+    });
   }
 }

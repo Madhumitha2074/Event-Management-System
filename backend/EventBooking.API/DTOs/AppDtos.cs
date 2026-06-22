@@ -159,7 +159,7 @@ namespace EventBooking.API.DTOs
         public bool HasSeatMap { get; set; }
         public string? SeatConfig { get; set; }
 
-        // ✅ NEW: Properties for expired event handling
+        // ✅ Properties for expired event handling
         public bool IsActive { get; set; }
         public string? TimeRemaining { get; set; }
         public bool IsEndingSoon { get; set; }
@@ -177,7 +177,7 @@ namespace EventBooking.API.DTOs
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 9;
 
-        // ✅ NEW: Filter options for expired events
+        // ✅ Filter options for expired events
         public bool IncludeExpired { get; set; } = false;
         public bool OnlyActive { get; set; } = true;
         public bool ShowLive { get; set; } = false;
@@ -193,7 +193,7 @@ namespace EventBooking.API.DTOs
         public int PageSize { get; set; }
         public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 
-        // ✅ NEW: Additional metadata
+        // ✅ Additional metadata
         public int ActiveCount { get; set; }
         public int ExpiredCount { get; set; }
         public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
@@ -246,15 +246,24 @@ namespace EventBooking.API.DTOs
         public List<AttendeeDto> Attendees { get; set; } = new();
     }
 
+    // ─────────────────────────────────────────────
+    // ✅ UPDATED: AttendeeDto with Email OR Phone support
+    // ─────────────────────────────────────────────
     public class AttendeeDto
     {
         [Required(ErrorMessage = "Attendee name is required.")]
         [StringLength(150, MinimumLength = 2, ErrorMessage = "Name must be between 2 and 150 characters.")]
         public string Name { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Attendee email is required.")]
-        [EmailAddress(ErrorMessage = "Invalid attendee email.")]
-        public string Email { get; set; } = string.Empty;
+        [EmailAddress(ErrorMessage = "Invalid attendee email format.")]
+        public string? Email { get; set; }
+
+        [Phone(ErrorMessage = "Invalid phone number.")]
+        [StringLength(15, MinimumLength = 10, ErrorMessage = "Phone number must be at least 10 digits.")]
+        public string? Phone { get; set; }
+
+        [Required(ErrorMessage = "Contact method is required.")]
+        public string ContactMethod { get; set; } = "email"; // "email" or "phone"
     }
 
     public class BookingDto
@@ -272,12 +281,17 @@ namespace EventBooking.API.DTOs
         public List<TicketDto> Tickets { get; set; } = new();
     }
 
+    // ─────────────────────────────────────────────
+    // ✅ UPDATED: TicketDto with Phone support
+    // ─────────────────────────────────────────────
     public class TicketDto
     {
         public int Id { get; set; }
         public string TicketNumber { get; set; } = string.Empty;
         public string AttendeeName { get; set; } = string.Empty;
         public string AttendeeEmail { get; set; } = string.Empty;
+        public string? AttendeePhone { get; set; }
+        public string ContactMethod { get; set; } = "email";
         public bool IsUsed { get; set; }
         public string? SeatNumber { get; set; }
         public string? Tier { get; set; }
@@ -320,7 +334,7 @@ namespace EventBooking.API.DTOs
     }
 
     // ─────────────────────────────────────────────
-    // ✅ NEW: EXPIRED EVENT DTOs
+    // ✅ EXPIRED EVENT DTOs
     // ─────────────────────────────────────────────
 
     public class ExpiredEventsCleanupResultDto
