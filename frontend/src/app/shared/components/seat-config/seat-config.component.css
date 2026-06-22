@@ -1,0 +1,182 @@
+.seat-config-container {
+  padding: 0.5rem 0;
+}
+
+/* Toggle Switch */
+.form-check-input {
+  cursor: pointer;
+  width: 2.5rem !important;
+  height: 1.25rem !important;
+}
+
+.form-check-input:checked {
+  background-color: #6c5ce7 !important;
+  border-color: #6c5ce7 !important;
+}
+
+.form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(108, 92, 231, 0.25) !important;
+}
+
+.form-check-label {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Alert Styles */
+.alert-info {
+  background-color: #d1ecf1;
+  border-color: #bee5eb;
+  color: #0c5460;
+}
+
+.alert-secondary {
+  background-color: #e9ecef;
+  border-color: #d6d8db;
+  color: #383d41;
+}
+
+/* Seat Tier Cards */
+.card.bg-light {
+  background-color: #f8f9fa !important;
+  border: 1px solid #dee2e6;
+}
+
+.card-body {
+  padding: 1rem;
+}
+
+.card {
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Form Labels */
+.form-label.small {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+/* Form Controls */
+.form-select-sm,
+.form-control-sm {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.form-select-sm:focus,
+.form-control-sm:focus {
+  border-color: #6c5ce7;
+  box-shadow: 0 0 0 0.15rem rgba(108, 92, 231, 0.15);
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, #6c5ce7, #5a4bd1);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4);
+}
+
+.btn-outline-danger {
+  transition: all 0.2s ease;
+}
+
+.btn-outline-danger:hover {
+  transform: scale(1.05);
+}
+
+/* Utility */
+.text-muted {
+  color: #6c757d !important;
+}
+
+.text-success {
+  color: #28a745 !important;
+}
+
+/* Animations */
+.card {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert {
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .seat-config-container {
+    padding: 0.25rem 0;
+  }
+  
+  .d-flex.justify-content-between {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem;
+  }
+  
+  .form-check {
+    align-self: flex-start;
+  }
+  
+  .row.g-2 {
+    --bs-gutter-y: 0.5rem;
+  }
+  
+  .col-md-3 {
+    margin-bottom: 0.5rem;
+  }
+  
+  .card-body {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-body {
+    padding: 0.5rem;
+  }
+  
+  .form-select-sm,
+  .form-control-sm {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.4rem;
+  }
+  
+  .alert-info,
+  .alert-secondary {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+  }
+}

@@ -371,7 +371,10 @@ export class SeatMapComponent implements OnChanges {
   sections: SeatSection[]     = [];
   selectedIds  = new Set<number>();
   selectedSeats: EventSeat[]  = [];
-  tierOrder: SeatTier[]       = ['Premium', 'Ordinary', 'Economy'];
+  
+  // ✅ FIX: Changed 'Ordinary' to 'Standard'
+  tierOrder: SeatTier[]       = ['Premium', 'Standard', 'Economy'];
+  
   tierColors                  = SEAT_TIER_COLORS;
 
   get totalPrice(): number {

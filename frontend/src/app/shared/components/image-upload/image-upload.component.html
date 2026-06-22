@@ -1,0 +1,73 @@
+<div class="image-upload-container">
+  <!-- Image Preview -->
+  <div class="preview-wrapper" *ngIf="previewUrl">
+    <div class="preview-card">
+      <img [src]="previewUrl" 
+           alt="Event preview" 
+           class="preview-image"
+           (load)="onImageLoad()"
+           (error)="onImageError()">
+      
+      <!-- Remove Button -->
+      <button type="button" class="remove-btn" (click)="removeImage()" title="Remove image">
+        <i class="fas fa-times"></i>
+      </button>
+      
+      <!-- Status Badge -->
+      <div class="status-badge" [class.badge-url]="isUrlMode" [class.badge-file]="isFileMode">
+        <i class="fas" [class.fa-link]="isUrlMode" [class.fa-check-circle]="isFileMode"></i>
+        {{ isUrlMode ? 'URL' : 'Uploaded' }}
+      </div>
+    </div>
+    
+    <!-- Clean Success Message - No URL visible -->
+    <div class="upload-success" *ngIf="isFileMode && fileName">
+      <i class="fas fa-check-circle"></i>
+      <span>{{ fileName }} uploaded successfully</span>
+    </div>
+  </div>
+
+  <!-- Upload Options -->
+  <div class="upload-section">
+    <!-- URL Input -->
+    <div class="input-row">
+      <div class="input-group">
+        <span class="input-icon"><i class="fas fa-link"></i></span>
+        <input type="text" 
+               class="url-input" 
+               [value]="imageUrl"
+               (input)="onUrlChange($event)"
+               placeholder="Paste image URL here..."
+               [disabled]="isUrlDisabled">
+      </div>
+      <span class="divider-text">or</span>
+    </div>
+
+    <!-- File Upload -->
+    <div class="file-upload-row">
+      <input type="file" 
+             (change)="onFileSelected($event)" 
+             accept="image/*"
+             [disabled]="isFileDisabled"
+             #fileInput>
+      <button type="button" class="upload-btn" 
+              (click)="fileInput.click()"
+              [disabled]="isFileDisabled">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <span>Upload Image</span>
+      </button>
+      <span class="file-info" *ngIf="fileName && !isFileDisabled">
+        <i class="fas fa-file-image"></i>
+        {{ fileName }}
+      </span>
+    </div>
+
+    <!-- Upload Progress -->
+    <div *ngIf="uploading" class="progress-container">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" [style.width]="uploadProgress + '%'"></div>
+      </div>
+      <span class="progress-label">{{ uploadProgress }}%</span>
+    </div>
+  </div>
+</div>

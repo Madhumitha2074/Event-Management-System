@@ -8,30 +8,57 @@ import { ToastrService } from 'ngx-toastr';
 @Component({
   selector: 'app-event-list',
   template: `
+    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- HERO SECTION WITH WAVE PATTERN                             -->
+    <!-- ════════════════════════════════════════════════════════════ -->
     <div class="page-hero">
+      <div class="deco-circle d1"></div>
+      <div class="deco-circle d2"></div>
+      <div class="deco-circle d3"></div>
+      
       <div class="container text-center">
         <h1 class="display-5 fw-bold">
           <i class="fas fa-calendar-star me-3"></i>Discover Events
         </h1>
         <p class="lead">Find and book amazing local events near you</p>
-        <div class="row justify-content-center mt-4">
-          <div class="col-md-6">
-            <div class="input-group input-group-lg shadow">
+        
+        <div class="row justify-content-center mt-4 search-wrapper">
+          <div class="col-md-8">
+            <div class="input-group input-group-lg shadow-lg">
               <input
                 class="form-control border-0"
-                placeholder="Search events, cities..."
+                placeholder="🔍 Search events, cities..."
                 [(ngModel)]="filter.search"
                 (ngModelChange)="onSearch()"
               />
               <button class="btn btn-light px-4">
-                <i class="fas fa-search"></i>
+                <i class="fas fa-search"></i> Search
               </button>
             </div>
           </div>
         </div>
+        
+        <div class="popular-cities mt-4">
+          <span class="text-white-50 me-2"><i class="fas fa-location-dot"></i> Popular:</span>
+          <span class="city-chip" (click)="quickFilterCity('Chennai')">
+            <i class="fas fa-city"></i> Chennai
+          </span>
+          <span class="city-chip" (click)="quickFilterCity('Coimbatore')">
+            <i class="fas fa-city"></i> Coimbatore
+          </span>
+          <span class="city-chip" (click)="quickFilterCity('Madurai')">
+            <i class="fas fa-city"></i> Madurai
+          </span>
+          <span class="city-chip" (click)="quickFilterCity('Trichy')">
+            <i class="fas fa-city"></i> Trichy
+          </span>
+        </div>
       </div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT                                               -->
+    <!-- ════════════════════════════════════════════════════════════ -->
     <div class="container pb-5">
       <div class="row">
 
@@ -42,7 +69,6 @@ import { ToastrService } from 'ngx-toastr';
               <i class="fas fa-sliders-h me-2 text-primary"></i>Filters
             </h5>
 
-            <!-- City filter with clear button -->
             <div class="mb-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <label class="form-label small fw-semibold mb-0">
@@ -102,7 +128,7 @@ import { ToastrService } from 'ngx-toastr';
             <div class="row g-2 mb-3">
               <div class="col-6">
                 <label class="form-label small fw-semibold mb-1">
-                  <i class="fas fa-rupee-sign me-1 text-muted"></i>Min Price
+                  <i class="fas fa-rupee-sign me-1 text-muted"></i>Min Price (₹)
                 </label>
                 <input
                   type="number"
@@ -113,7 +139,7 @@ import { ToastrService } from 'ngx-toastr';
               </div>
               <div class="col-6">
                 <label class="form-label small fw-semibold mb-1">
-                  <i class="fas fa-rupee-sign me-1 text-muted"></i>Max Price
+                  <i class="fas fa-rupee-sign me-1 text-muted"></i>Max Price (₹)
                 </label>
                 <input
                   type="number"
@@ -124,7 +150,6 @@ import { ToastrService } from 'ngx-toastr';
               </div>
             </div>
 
-            <!-- Apply + Clear buttons -->
             <div class="d-grid gap-2">
               <button
                 class="btn btn-primary btn-sm"
@@ -144,9 +169,12 @@ import { ToastrService } from 'ngx-toastr';
         <!-- ── Event Grid ── -->
         <div class="col-lg-9">
 
+          <!-- Results Count -->
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <span class="text-muted">
-              <i class="fas fa-list me-1"></i>{{ result?.totalCount || 0 }} events found
+            <span class="results-count">
+              <i class="fas fa-list me-1"></i>
+              <strong>{{ result?.totalCount || 0 }}</strong> 
+              {{ (result?.totalCount || 0) === 1 ? 'Event Found' : 'Events Found' }}
             </span>
             <div *ngIf="filter.city" class="badge bg-primary">
               <i class="fas fa-map-marker-alt me-1"></i>
@@ -179,55 +207,64 @@ import { ToastrService } from 'ngx-toastr';
                     alt="{{ event.title }}"
                   />
                   <span class="category-badge">{{ event.category }}</span>
+                  <div class="tickets-badge">
+                    <i class="fas fa-ticket-alt"></i>
+                    {{ event.availableTickets }}
+                  </div>
                 </div>
                 <div class="card-body d-flex flex-column">
                   
                   <!-- Price -->
                   <div class="price-tag">
                     <ng-container *ngIf="event.hasSeatMap && event.minPrice && event.maxPrice && event.minPrice !== event.maxPrice">
-                      <span class="price-amount">From ₹{{ event.minPrice }}</span>
+                      <span class="price-from">From</span>
+                      <span class="price-amount">₹{{ event.minPrice }}</span>
                       <span class="price-unit">/seat</span>
                     </ng-container>
-                    <ng-container *ngIf="!event.hasSeatMap || !event.minPrice || event.minPrice === event.maxPrice">
-                      <span class="price-amount">{{ event.ticketPrice === 0 ? 'FREE' : (event.ticketPrice | currency:'INR':'symbol':'1.2-2') }}</span>
-                      <span class="price-unit">/ticket</span>
+                    
+                    <ng-container *ngIf="event.hasSeatMap && event.minPrice && event.minPrice === event.maxPrice">
+                      <span class="price-amount">₹{{ event.minPrice }}</span>
+                      <span class="price-unit">/seat</span>
+                    </ng-container>
+                    
+                    <ng-container *ngIf="!event.hasSeatMap">
+                      <span class="price-amount" [class.free]="event.ticketPrice === 0">
+                        {{ event.ticketPrice === 0 ? 'FREE' : ('₹' + event.ticketPrice) }}
+                      </span>
+                      <span class="price-unit" *ngIf="event.ticketPrice !== 0">/ticket</span>
                     </ng-container>
                   </div>
                   
                   <!-- Title -->
                   <h6 class="event-title">{{ event.title }}</h6>
                   
-                  <!-- Location with Google Maps Link -->
+                  <!-- Location -->
                   <p class="event-location">
-                    <a [href]="event.googleMapsUrl || getGoogleMapsUrl(event)" 
-                       target="_blank" 
-                       class="text-decoration-none"
-                       title="Open in Google Maps">
-                      <i class="fas fa-map-marker-alt me-1"></i>
-                      {{ event.venue }}, {{ event.city }}
-                    </a>
+                    <i class="fas fa-map-marker-alt me-1"></i>
+                    {{ event.venue }}, {{ event.city }}
                   </p>
                   
-                  <!-- Date -->
+                  <!-- ✅ Date with bullet separator -->
                   <p class="event-date">
-                    <i class="fas fa-calendar me-1"></i>
-                    {{ event.startDateTime | date:'MMM d, y, h:mm a' }}
+                    <i class="far fa-calendar-alt me-1"></i>
+                    <strong>{{ event.startDateTime | date:'EEE, MMM d, y' }}</strong>
+                    <span class="date-separator">•</span>
+                    <strong>{{ event.startDateTime | date:'h:mm a' }}</strong>
                   </p>
                   
                   <!-- Description -->
                   <p class="event-description">
-                    {{ event.description | slice:0:80 }}...
+                    {{ event.description | slice:0:70 }}...
                   </p>
                   
                   <!-- Footer -->
                   <div class="event-footer">
                     <div class="tickets-left">
-                      <i class="fas fa-ticket-alt me-1"></i>
+                      <span class="dot"></span>
                       {{ event.availableTickets }} left
                     </div>
-                    <a [routerLink]="['/events', event.id]"
-                       class="btn-view">
-                      View Details <i class="fas fa-arrow-right ms-1"></i>
+                    <a [routerLink]="['/events', event.id]" class="btn-book-now">
+                      <i class="fas fa-ticket-alt me-1"></i> Book Now
                     </a>
                   </div>
                   
@@ -267,20 +304,176 @@ import { ToastrService } from 'ngx-toastr';
     </div>
   `,
   styles: [`
+    /* ════════════════════════════════════════════════════════════════
+       HERO SECTION WITH WAVE PATTERN
+       ════════════════════════════════════════════════════════════════ */
     .page-hero {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #6C5CE7 0%, #A29BFE 50%, #FDCB6E 100%);
       color: white;
-      padding: 80px 0;
+      padding: 80px 0 120px 0;
       margin-bottom: 40px;
-      border-radius: 0 0 40px 40px;
+      position: relative;
+      overflow: hidden;
     }
+
+    .page-hero::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z' fill='%23ffffff' opacity='0.3'/%3E%3C/svg%3E");
+      background-size: cover;
+      background-position: bottom;
+    }
+
+    .page-hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+      animation: float-bubble 8s ease-in-out infinite;
+    }
+
+    @keyframes float-bubble {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-30px, -20px) scale(1.1); }
+    }
+
     .page-hero h1 {
-      font-size: 3rem;
+      font-size: 3.5rem;
+      font-weight: 800;
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+      animation: fade-up 0.8s ease-out;
     }
+
     .page-hero .lead {
-      font-size: 1.2rem;
-      opacity: 0.9;
+      font-size: 1.3rem;
+      opacity: 0.95;
+      text-shadow: 0 1px 10px rgba(0, 0, 0, 0.1);
+      animation: fade-up 1s ease-out;
     }
+
+    @keyframes fade-up {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .search-wrapper {
+      animation: fade-up 1.2s ease-out;
+    }
+
+    .search-wrapper .input-group {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      border-radius: 50px !important;
+      padding: 4px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .search-wrapper .form-control {
+      background: transparent;
+      border: none;
+      padding: 16px 24px;
+      font-size: 1rem;
+      color: white;
+    }
+
+    .search-wrapper .form-control::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .search-wrapper .form-control:focus {
+      box-shadow: none;
+      background: transparent;
+    }
+
+    .search-wrapper .btn-light {
+      border-radius: 50px !important;
+      padding: 12px 28px;
+      background: white;
+      color: #6C5CE7;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      border: none;
+    }
+
+    .search-wrapper .btn-light:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .popular-cities {
+      animation: fade-up 1.4s ease-out;
+    }
+
+    .popular-cities .city-chip {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 6px 18px;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .popular-cities .city-chip:hover {
+      background: white;
+      color: #6C5CE7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .popular-cities .city-chip i {
+      margin-right: 6px;
+    }
+
+    .deco-circle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      pointer-events: none;
+    }
+
+    .deco-circle.d1 {
+      width: 200px;
+      height: 200px;
+      bottom: -50px;
+      left: -50px;
+    }
+
+    .deco-circle.d2 {
+      width: 150px;
+      height: 150px;
+      top: -30px;
+      right: 20%;
+    }
+
+    .deco-circle.d3 {
+      width: 100px;
+      height: 100px;
+      bottom: 20%;
+      right: 10%;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       FILTER SIDEBAR
+       ════════════════════════════════════════════════════════════════ */
     .filter-sidebar {
       background: white;
       border-radius: 16px;
@@ -289,32 +482,41 @@ import { ToastrService } from 'ngx-toastr';
       position: sticky;
       top: 20px;
     }
+
+    /* ════════════════════════════════════════════════════════════════
+       EVENT CARDS
+       ════════════════════════════════════════════════════════════════ */
     .event-card {
       border: none;
       border-radius: 16px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       overflow: hidden;
       background: white;
     }
+
     .event-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
     }
+
     .card-img-wrapper {
       position: relative;
       overflow: hidden;
       height: 200px;
     }
+
     .card-img-top {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: transform 0.3s ease;
+      transition: transform 0.5s ease;
     }
+
     .event-card:hover .card-img-top {
       transform: scale(1.05);
     }
+
     .category-badge {
       position: absolute;
       top: 12px;
@@ -322,58 +524,119 @@ import { ToastrService } from 'ngx-toastr';
       background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
       border-radius: 20px;
-      padding: 4px 12px;
+      padding: 4px 14px;
       font-size: 0.7rem;
       font-weight: 600;
       letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
+
+    .tickets-badge {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .card-body {
       padding: 20px;
     }
+
     .price-tag {
-      margin-bottom: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 2px;
     }
+
+    .price-from {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #a0aec0;
+      margin-right: 2px;
+    }
+
     .price-amount {
-      font-size: 1.3rem;
+      font-size: 1.5rem;
       font-weight: 800;
       color: #667eea;
     }
+
     .price-unit {
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       color: #a0aec0;
-      margin-left: 2px;
+      font-weight: 500;
     }
+
+    .price-amount.free {
+      color: #48bb78;
+    }
+
     .event-title {
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       margin-bottom: 8px;
       color: #2d3748;
-      line-height: 1.4;
+      line-height: 1.3;
     }
+
     .event-location {
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       color: #718096;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
-    .event-location a {
-      color: #718096;
-      transition: color 0.2s;
-    }
-    .event-location a:hover {
+
+    .event-location i {
       color: #667eea;
+      width: 16px;
     }
+
+    /* ✅ Updated: Date with bullet separator */
     .event-date {
-      font-size: 0.7rem;
-      color: #a0aec0;
+      font-size: 0.85rem;
+      color: #444;
       margin-bottom: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
+
+    .event-date i {
+      color: #667eea;
+      width: 16px;
+    }
+
+    .event-date strong {
+      color: #667eea;
+      font-weight: 700;
+    }
+
+    .event-date .date-separator {
+      color: #ccc;
+      font-weight: 300;
+      margin: 0 2px;
+    }
+
     .event-description {
-      font-size: 0.75rem;
-      color: #718096;
+      font-size: 0.8rem;
+      color: #a0aec0;
       line-height: 1.5;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       flex-grow: 1;
     }
+
     .event-footer {
       display: flex;
       justify-content: space-between;
@@ -381,73 +644,176 @@ import { ToastrService } from 'ngx-toastr';
       padding-top: 12px;
       border-top: 1px solid #e2e8f0;
     }
+
     .tickets-left {
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       color: #48bb78;
       font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .btn-view {
+
+    .tickets-left .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #48bb78;
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .btn-book-now {
       background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
       border: none;
-      padding: 6px 16px;
+      padding: 8px 20px;
       border-radius: 25px;
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       font-weight: 600;
       text-decoration: none;
       transition: all 0.3s ease;
       display: inline-flex;
       align-items: center;
+      gap: 6px;
+      cursor: pointer;
     }
-    .btn-view:hover {
-      transform: translateX(3px);
+
+    .btn-book-now:hover {
+      transform: translateX(4px) scale(1.05);
       color: white;
-      background: linear-gradient(135deg, #5a67d8, #6b46c1);
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
     }
+
+    .results-count {
+      font-size: 0.9rem;
+      color: #718096;
+    }
+
+    .results-count strong {
+      color: #2d3748;
+    }
+
     .btn-primary {
       background: linear-gradient(135deg, #667eea, #764ba2);
       border: none;
     }
+
     .btn-primary:hover {
       background: linear-gradient(135deg, #5a67d8, #6b46c1);
       transform: translateY(-1px);
     }
+
     .btn-outline-secondary:hover {
       background: #e2e8f0;
       transform: translateY(-1px);
     }
+
     .badge.bg-primary {
       background: linear-gradient(135deg, #667eea, #764ba2) !important;
       padding: 6px 12px;
       border-radius: 30px;
     }
+
     .pagination .page-item.active .page-link {
       background: linear-gradient(135deg, #667eea, #764ba2);
       border-color: #667eea;
     }
+
     .pagination .page-link {
       color: #667eea;
       border-radius: 8px;
       margin: 0 3px;
     }
+
     .pagination .page-link:hover {
       background: #f0f0f0;
       color: #5a67d8;
     }
+
     .form-control:focus, .form-select:focus {
       border-color: #667eea;
       box-shadow: 0 0 0 0.2rem rgba(102,126,234,0.25);
     }
+
+    /* ════════════════════════════════════════════════════════════════
+       RESPONSIVE
+       ════════════════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
       .page-hero {
-        padding: 50px 0;
+        padding: 50px 0 80px 0;
       }
+      
       .page-hero h1 {
-        font-size: 2rem;
+        font-size: 2.2rem;
       }
+      
+      .page-hero .lead {
+        font-size: 1rem;
+      }
+      
+      .search-wrapper .form-control {
+        font-size: 0.9rem;
+        padding: 12px 16px;
+      }
+      
+      .search-wrapper .btn-light {
+        padding: 10px 18px;
+        font-size: 0.9rem;
+      }
+      
+      .popular-cities .city-chip {
+        font-size: 0.75rem;
+        padding: 4px 12px;
+      }
+      
+      .page-hero::after {
+        height: 40px;
+      }
+      
       .filter-sidebar {
         position: relative;
         top: 0;
+      }
+      
+      .btn-book-now {
+        padding: 6px 14px;
+        font-size: 0.7rem;
+      }
+      
+      .price-amount {
+        font-size: 1.2rem;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .page-hero h1 {
+        font-size: 1.8rem;
+      }
+      
+      .popular-cities {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+      }
+      
+      .event-card .card-body {
+        padding: 16px;
+      }
+      
+      .event-title {
+        font-size: 0.95rem;
+      }
+      
+      .event-date {
+        font-size: 0.75rem;
+        gap: 4px;
       }
     }
   `]
@@ -491,6 +857,14 @@ export class EventListComponent implements OnInit {
         this.filter.page = 1;
         this.loadEvents();
       });
+  }
+
+  quickFilterCity(city: string): void {
+    this.filter.city = city;
+    this.pendingFilter.city = city;
+    this.filter.page = 1;
+    this.loadEvents();
+    this.toastr.info(`🎯 Showing events in ${city}`);
   }
 
   getGoogleMapsUrl(event: any): string {

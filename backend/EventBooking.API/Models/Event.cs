@@ -1,3 +1,5 @@
+using System;
+
 namespace EventBooking.API.Models
 {
     public enum EventStatus { Draft, Published, Cancelled, Completed }
@@ -16,6 +18,11 @@ namespace EventBooking.API.Models
         public string City { get; set; } = string.Empty;
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
+        
+        // ✅ ADD THESE TWO PROPERTIES
+        public string? GoogleMapsUrl { get; set; }
+        public string? ContactEmail { get; set; }
+        
         public decimal TicketPrice { get; set; }
         public int TotalTickets { get; set; }
         public int BookedTickets { get; set; } = 0;
@@ -27,7 +34,10 @@ namespace EventBooking.API.Models
         public User Organizer { get; set; } = null!;
         public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
         
-        // NEW: Seat configuration JSON string
-        public string? SeatConfig { get; set; }  // Stores seat tier configuration as JSON
+        // Seat configuration JSON string
+        public string? SeatConfig { get; set; }
+        
+        // ✅ ADD THIS - For tracking if event has seat map
+        public bool HasSeatMap { get; set; }
     }
 }

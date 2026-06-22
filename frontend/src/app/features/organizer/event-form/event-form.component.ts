@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, FormArray, AbstractControl, ValidationErrors } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EventService } from '../../../core/services/event.service';
 import { EVENT_CATEGORIES, SeatTierConfig } from '../../../core/models/models';
@@ -7,250 +7,8 @@ import { ToastrService } from 'ngx-toastr';
 
 @Component({
   selector: 'app-event-form',
-  template: `
-    <div class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-10">
-          <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-5">
-              <h3 class="fw-bold mb-4">
-                <i class="fas fa-calendar-plus text-primary me-3"></i>
-                {{ isEdit ? 'Edit Event' : 'Create New Event' }}
-              </h3>
-
-              <form [formGroup]="form" (ngSubmit)="onSubmit()">
-                <div class="row g-3">
-
-                  <div class="col-12">
-                    <label class="form-label">Event Title *</label>
-                    <input class="form-control" formControlName="title"
-                           placeholder="Amazing Summer Concert">
-                    <div *ngIf="form.get('title')?.touched && form.get('title')?.invalid"
-                         class="text-danger small">Title is required.</div>
-                  </div>
-
-                  <div class="col-12">
-                    <label class="form-label">Description *</label>
-                    <textarea class="form-control" formControlName="description"
-                              rows="4" placeholder="Describe your event..."></textarea>
-                    <div *ngIf="form.get('description')?.touched && form.get('description')?.invalid"
-                         class="text-danger small">Description is required.</div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">Category *</label>
-                    <select class="form-select" formControlName="category">
-                      <option *ngFor="let cat of categories" [value]="cat.value">
-                        {{ cat.label }}
-                      </option>
-                    </select>
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">Image URL</label>
-                    <input class="form-control" formControlName="imageUrl"
-                           placeholder="https://...">
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">Start Date & Time *</label>
-                    <input type="datetime-local" class="form-control"
-                           formControlName="startDateTime">
-                    <div *ngIf="form.get('startDateTime')?.touched && form.get('startDateTime')?.invalid"
-                         class="text-danger small">Start date is required.</div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">End Date & Time *</label>
-                    <input type="datetime-local" class="form-control"
-                           formControlName="endDateTime">
-                    <div *ngIf="form.get('endDateTime')?.touched && form.get('endDateTime')?.invalid"
-                         class="text-danger small">End date is required.</div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">Venue *</label>
-                    <input class="form-control" formControlName="venue"
-                           placeholder="Madison Square Garden">
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">City *</label>
-                    <input class="form-control" formControlName="city"
-                           placeholder="Chennai">
-                  </div>
-
-                  <div class="col-12">
-                    <label class="form-label">Full Address</label>
-                    <input class="form-control" formControlName="address"
-                           placeholder="123 Main Street, Chennai">
-                  </div>
-
-                  <!-- Google Maps Location Link Field -->
-                  <div class="col-12">
-                    <label class="form-label">
-                      <i class="fab fa-google me-1 text-danger"></i>
-                      Google Maps Location Link 
-                      <small class="text-muted">(Optional)</small>
-                    </label>
-                    <div class="input-group">
-                      <span class="input-group-text bg-white">
-                        <i class="fas fa-map-marker-alt text-danger"></i>
-                      </span>
-                      <input type="url" class="form-control" formControlName="googleMapsUrl" 
-                             placeholder="https://maps.google.com/?q=YMCA+Nandanam+Chennai">
-                      <button class="btn btn-outline-secondary" type="button" 
-                              (click)="openGoogleMapsHelp()" title="How to get Google Maps link">
-                        <i class="fas fa-question"></i>
-                      </button>
-                    </div>
-                    <small class="text-muted d-block mt-1">
-                      <i class="fas fa-info-circle me-1"></i>
-                      How to get link: 
-                      <strong>1.</strong> Open Google Maps → <strong>2.</strong> Search for venue → 
-                      <strong>3.</strong> Click "Share" → <strong>4.</strong> Copy link
-                    </small>
-                    <small class="text-muted d-block">
-                      Example: <code>https://maps.google.com/?q=YMCA+Nandanam+Chennai</code>
-                    </small>
-                  </div>
-
-                  <!-- Seat Configuration Section -->
-                  <div class="col-12 mt-3">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                      <h5 class="fw-bold mb-0">
-                        <i class="fas fa-chair me-2"></i>Seat Configuration
-                      </h5>
-                      <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" 
-                               id="enableSeatConfig" [(ngModel)]="enableSeatConfig"
-                               [ngModelOptions]="{standalone: true}">
-                        <label class="form-check-label" for="enableSeatConfig">
-                          Enable Seat Map
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div *ngIf="enableSeatConfig" class="alert alert-info small">
-                      <i class="fas fa-info-circle me-1"></i>
-                      Configure different seating tiers. Total tickets will be calculated automatically.
-                      Ticket price will be set to the lowest tier price.
-                    </div>
-
-                    <div *ngIf="enableSeatConfig">
-                      <div formArrayName="seatTiers">
-                        <div *ngFor="let tier of seatTiersArray.controls; let i = index" 
-                             [formGroupName]="i" class="card mb-3 bg-light">
-                          <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                              <h6 class="fw-bold mb-0">Tier {{ i + 1 }}</h6>
-                              <button type="button" class="btn btn-sm btn-outline-danger"
-                                      (click)="removeTier(i)">
-                                <i class="fas fa-trash"></i>
-                              </button>
-                            </div>
-
-                            <div class="row g-2">
-                              <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Tier Type</label>
-                                <select class="form-select form-select-sm" formControlName="tier">
-                                  <option value="Premium">Premium ⭐</option>
-                                  <option value="Ordinary">Ordinary 🪑</option>
-                                  <option value="Economy">Economy 💺</option>
-                                </select>
-                              </div>
-                              <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Rows</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       formControlName="rows" min="1" max="50">
-                              </div>
-                              <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Seats Per Row</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       formControlName="seatsPerRow" min="1" max="50">
-                              </div>
-                              <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Price (₹)</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       formControlName="price" min="0" step="10">
-                              </div>
-                            </div>
-                            
-                            <div class="text-muted small mt-2">
-                              <i class="fas fa-calculator me-1"></i>
-                              This tier will have {{ getTierSeatCount(i) }} seats
-                              ({{ tier.get('rows')?.value || 0 }} rows × {{ tier.get('seatsPerRow')?.value || 0 }} seats)
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button type="button" class="btn btn-sm btn-outline-primary mt-2"
-                              (click)="addTier()">
-                        <i class="fas fa-plus me-1"></i>Add Tier
-                      </button>
-                      
-                      <!-- Summary -->
-                      <div class="alert alert-secondary mt-3" *ngIf="seatTiersArray.length > 0">
-                        <div class="d-flex justify-content-between">
-                          <span><strong>Total Seats:</strong></span>
-                          <span>{{ getTotalSeats() }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                          <span><strong>Price Range:</strong></span>
-                          <span>₹{{ getMinPrice() }} - ₹{{ getMaxPrice() }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between text-success">
-                          <span><strong>Base Ticket Price:</strong></span>
-                          <span>₹{{ getMinPrice() }} (lowest tier)</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Traditional fields (hidden when seat config is enabled) -->
-                    <div *ngIf="!enableSeatConfig" class="row">
-                      <div class="col-md-6">
-                        <label class="form-label">Ticket Price (₹) *</label>
-                        <input type="number" class="form-control" formControlName="ticketPrice"
-                               placeholder="0 for free" min="0">
-                      </div>
-
-                      <div class="col-md-6">
-                        <label class="form-label">Total Tickets *</label>
-                        <input type="number" class="form-control" formControlName="totalTickets"
-                               placeholder="100" min="1">
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Status only shown on Edit -->
-                  <div *ngIf="isEdit" class="col-12">
-                    <label class="form-label">Status</label>
-                    <select class="form-select" formControlName="status">
-                      <option value="Draft">Draft</option>
-                      <option value="Published">Published</option>
-                      <option value="Cancelled">Cancelled</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                  </div>
-
-                </div>
-
-                <div class="d-flex gap-3 mt-4">
-                  <button class="btn btn-primary px-4" type="submit" [disabled]="loading">
-                    <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
-                    {{ isEdit ? 'Update Event' : 'Create Event' }}
-                  </button>
-                  <a routerLink="/organizer" class="btn btn-outline-secondary px-4">Cancel</a>
-                </div>
-
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `
+  templateUrl: './event-form.component.html',
+  styleUrls: ['./event-form.component.css']
 })
 export class EventFormComponent implements OnInit {
   form!: FormGroup;
@@ -259,11 +17,43 @@ export class EventFormComponent implements OnInit {
   loading = false;
   eventId: number | null = null;
   enableSeatConfig = false;
+  formSubmitted = false;
 
   private readonly categoryMap: Record<string, number> = {
     'Music': 0, 'Sports': 1, 'Technology': 2, 'Food': 3,
     'Art': 4, 'Business': 5, 'Health': 6, 'Other': 7
   };
+
+  static dateRangeValidator(control: AbstractControl): ValidationErrors | null {
+    const start = control.get('startDateTime')?.value;
+    const end = control.get('endDateTime')?.value;
+    if (start && end && new Date(start) >= new Date(end)) {
+      return { dateRange: true };
+    }
+    return null;
+  }
+
+  static pastDateValidator(control: AbstractControl): ValidationErrors | null {
+    const start = control.get('startDateTime')?.value;
+    if (start) {
+      const startDate = new Date(start);
+      const now = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      if (startDate < now) {
+        return { pastDate: true };
+      }
+    }
+    return null;
+  }
+
+  static imageValidator(control: AbstractControl): ValidationErrors | null {
+    const url = control.value;
+    if (url && !url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|bmp|webp|svg)(\?.*)?$/i)) {
+      return { invalidImageUrl: true };
+    }
+    return null;
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -274,75 +64,169 @@ export class EventFormComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.initializeForm();
+    this.loadEventIfEditing();
+  }
+
+  shouldShowError(control: AbstractControl | null): boolean {
+    if (!control) return false;
+    return this.formSubmitted && control.invalid;
+  }
+
+  initializeForm(): void {
     this.form = this.fb.group({
-      title: ['', Validators.required],
-      description: ['', Validators.required],
+      title: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
+      description: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(2000)]],
       category: [0, Validators.required],
+      contactEmail: ['', [Validators.required, Validators.pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)]],
       startDateTime: ['', Validators.required],
       endDateTime: ['', Validators.required],
-      venue: ['', Validators.required],
-      city: ['', Validators.required],
+      venue: ['', [Validators.required, Validators.minLength(2)]],
+      city: ['', [Validators.required, Validators.minLength(2)]],
       address: [''],
-      imageUrl: [''],
-      googleMapsUrl: [''], // NEW: Google Maps location link
+      imageUrl: ['', [EventFormComponent.imageValidator]],
+      googleMapsUrl: [''],
       ticketPrice: [0, [Validators.required, Validators.min(0)]],
       totalTickets: [100, [Validators.required, Validators.min(1)]],
       status: ['Draft'],
       seatTiers: this.fb.array([])
+    }, { 
+      validators: [
+        EventFormComponent.dateRangeValidator,
+        EventFormComponent.pastDateValidator
+      ] 
     });
+  }
 
+  loadEventIfEditing(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit = true;
       this.eventId = +id;
 
-      this.eventService.getEventById(+id).subscribe(ev => {
-        this.form.patchValue({
-          title: ev.title,
-          description: ev.description,
-          category: this.categoryMap[ev.category] ?? 0,
-          startDateTime: ev.startDateTime.slice(0, 16),
-          endDateTime: ev.endDateTime.slice(0, 16),
-          venue: ev.venue,
-          city: ev.city,
-          address: ev.address ?? '',
-          imageUrl: ev.imageUrl ?? '',
-          googleMapsUrl: ev.googleMapsUrl ?? '', // NEW
-          ticketPrice: ev.ticketPrice,
-          totalTickets: ev.totalTickets,
-          status: ev.status
-        });
+      this.eventService.getEventById(+id).subscribe({
+        next: (ev) => {
+          console.log('📋 Loading event data:', ev);
+          
+          this.form.patchValue({
+            title: ev.title || '',
+            description: ev.description || '',
+            category: this.categoryMap[ev.category] ?? 0,
+            contactEmail: ev.contactEmail || '',
+            startDateTime: ev.startDateTime ? ev.startDateTime.slice(0, 16) : '',
+            endDateTime: ev.endDateTime ? ev.endDateTime.slice(0, 16) : '',
+            venue: ev.venue || '',
+            city: ev.city || '',
+            address: ev.address || '',
+            imageUrl: ev.imageUrl || '',
+            googleMapsUrl: ev.googleMapsUrl || '',
+            ticketPrice: ev.ticketPrice || 0,
+            totalTickets: ev.totalTickets || 100,
+            status: ev.status || 'Draft'
+          });
 
-        // Load existing seat configuration if any
-        if (ev.seatConfig) {
-          this.enableSeatConfig = true;
-          const config = JSON.parse(ev.seatConfig);
-          config.forEach((tier: SeatTierConfig) => this.addTier(tier));
+          // Mark all fields as untouched and pristine after loading
+          Object.keys(this.form.controls).forEach(key => {
+            const control = this.form.get(key);
+            if (control) {
+              control.markAsUntouched();
+              control.markAsPristine();
+              control.updateValueAndValidity();
+            }
+          });
+
+          if (ev.seatConfig) {
+            this.enableSeatConfig = true;
+            console.log('📋 Raw seat config from DB:', ev.seatConfig);
+            
+            try {
+              let config = JSON.parse(ev.seatConfig);
+              console.log('📋 Parsed config:', config);
+              
+              if (config.seatTiers) {
+                config = config.seatTiers;
+              }
+              
+              if (!Array.isArray(config)) {
+                config = [config];
+              }
+              
+              console.log('📋 Final config array:', config);
+              
+              while (this.seatTiersArray.length) {
+                this.seatTiersArray.removeAt(0);
+              }
+              
+              config.forEach((tier: any) => {
+                this.addTier({
+                  tier: tier.tier || 'Standard',
+                  rows: tier.rows || 10,
+                  seatsPerRow: tier.seatsPerRow || 10,
+                  price: tier.price || 100
+                });
+              });
+              
+              console.log('✅ Loaded tiers:', this.seatTiersArray.length);
+              console.log('📋 Tier values:', this.seatTiersArray.value);
+            } catch (error) {
+              console.error('❌ Error parsing seat config:', error);
+              this.addTier();
+            }
+          }
+        },
+        error: (err) => {
+          this.toastr.error('Failed to load event details');
+          console.error(err);
         }
       });
     }
   }
 
-  // Helper method to open Google Maps help
-  openGoogleMapsHelp(): void {
-    window.open('https://support.google.com/maps/answer/144361?co=GENIE.Platform%3DDesktop&hl=en', '_blank');
-  }
+  // ============= FORM CONTROL GETTERS =============
 
+  get title() { return this.form.get('title'); }
+  get description() { return this.form.get('description'); }
+  get category() { return this.form.get('category'); }
+  get contactEmail() { return this.form.get('contactEmail'); }
+  get startDateTime() { return this.form.get('startDateTime'); }
+  get endDateTime() { return this.form.get('endDateTime'); }
+  get venue() { return this.form.get('venue'); }
+  get city() { return this.form.get('city'); }
+  get imageUrl() { return this.form.get('imageUrl'); }
+  get ticketPrice() { return this.form.get('ticketPrice'); }
+  get totalTickets() { return this.form.get('totalTickets'); }
+  get googleMapsUrl() { return this.form.get('googleMapsUrl'); }
+  
   get seatTiersArray(): FormArray {
     return this.form.get('seatTiers') as FormArray;
   }
 
+  // ============= SEAT TIER METHODS =============
+
   addTier(existingTier?: SeatTierConfig): void {
+    console.log('➕ Adding tier with data:', existingTier);
+    
+    const tierType = existingTier?.tier || 'Standard';
+    const rows = existingTier?.rows || 10;
+    const seatsPerRow = existingTier?.seatsPerRow || 10;
+    const price = existingTier?.price || 100;
+    
+    console.log(`📋 Creating tier: ${tierType}, ${rows}x${seatsPerRow}, ₹${price}`);
+    
     const tierForm = this.fb.group({
-      tier: [existingTier?.tier || 'Ordinary', Validators.required],
-      rows: [existingTier?.rows || 10, [Validators.required, Validators.min(1), Validators.max(50)]],
-      seatsPerRow: [existingTier?.seatsPerRow || 10, [Validators.required, Validators.min(1), Validators.max(50)]],
-      price: [existingTier?.price || 100, [Validators.required, Validators.min(0)]]
+      tier: [tierType, Validators.required],
+      rows: [rows, [Validators.required, Validators.min(1), Validators.max(50)]],
+      seatsPerRow: [seatsPerRow, [Validators.required, Validators.min(1), Validators.max(50)]],
+      price: [price, [Validators.required, Validators.min(0)]]
     });
+    
     this.seatTiersArray.push(tierForm);
+    console.log('✅ Tier added. Total:', this.seatTiersArray.length);
+    console.log('📋 Tier value:', tierForm.value);
   }
 
   removeTier(index: number): void {
+    console.log('🗑️ Removing tier at index:', index);
     this.seatTiersArray.removeAt(index);
   }
 
@@ -379,41 +263,110 @@ export class EventFormComponent implements OnInit {
     return max;
   }
 
+  // ============= TOGGLE SEAT CONFIG =============
+
+  toggleSeatConfig(event: any): void {
+    const checked = event.target.checked;
+    console.log('🔄 Toggle seat config:', checked);
+    this.enableSeatConfig = checked;
+    if (!checked) {
+      this.seatTiersArray.clear();
+      console.log('🗑️ Cleared all tiers');
+    }
+  }
+
+  // ============= EVENT HANDLERS FROM CHILD COMPONENTS =============
+
+  onImageUploaded(imageData: { url: string; file?: File }): void {
+    this.form.patchValue({ imageUrl: imageData.url });
+    if (imageData.file) {
+      // Additional logic if needed
+    }
+  }
+
+  onImageRemoved(): void {
+    this.form.patchValue({ imageUrl: '' });
+    this.toastr.info('Image removed');
+  }
+
+  // ============= NAVIGATION METHODS =============
+
+  goToOrganizer(): void {
+    this.router.navigate(['/organizer']);
+  }
+
+  // ============= GOOGLE MAPS HELP =============
+
+  openGoogleMapsHelp(): void {
+    window.open('https://support.google.com/maps/answer/144361?co=GENIE.Platform%3DDesktop&hl=en', '_blank');
+  }
+
+  // ============= FORM SUBMISSION =============
+
   onSubmit(): void {
+    this.formSubmitted = true;
+    
     if (this.form.invalid) {
-      this.form.markAllAsTouched();
+      // Mark all fields as touched on submit
+      Object.keys(this.form.controls).forEach(key => {
+        const control = this.form.get(key);
+        if (control) {
+          control.markAsTouched();
+        }
+      });
+      
+      if (this.form.hasError('pastDate')) {
+        this.toastr.error('Start date must be in the future!', 'Invalid Date');
+        return;
+      }
+      
+      this.toastr.warning('Please fix all validation errors');
       return;
     }
     
     this.loading = true;
 
+    const startDate = new Date(this.form.value.startDateTime);
+    const endDate = new Date(this.form.value.endDateTime);
+
     const data: any = {
       title: this.form.value.title,
       description: this.form.value.description,
       category: this.form.value.category,
-      startDateTime: this.form.value.startDateTime,
-      endDateTime: this.form.value.endDateTime,
+      contactEmail: this.form.value.contactEmail,
+      startDateTime: startDate.toISOString(),
+      endDateTime: endDate.toISOString(),
       venue: this.form.value.venue,
       city: this.form.value.city,
-      address: this.form.value.address,
-      imageUrl: this.form.value.imageUrl,
-      googleMapsUrl: this.form.value.googleMapsUrl // NEW: Include Google Maps URL
+      address: this.form.value.address || '',
+      imageUrl: this.form.value.imageUrl || '',
+      googleMapsUrl: this.form.value.googleMapsUrl || ''
     };
 
     if (this.enableSeatConfig && this.seatTiersArray.length > 0) {
-      const seatTiers = this.form.value.seatTiers;
+      const seatTiers = this.form.value.seatTiers.map((tier: any) => ({
+        tier: tier.tier,
+        rows: Number(tier.rows),
+        seatsPerRow: Number(tier.seatsPerRow),
+        price: Number(tier.price)
+      }));
+      
       data.seatTiers = seatTiers;
       data.totalTickets = this.getTotalSeats();
       data.ticketPrice = this.getMinPrice();
+      data.hasSeatMap = true;
     } else {
-      data.ticketPrice = this.form.value.ticketPrice;
-      data.totalTickets = this.form.value.totalTickets;
+      data.ticketPrice = Number(this.form.value.ticketPrice);
+      data.totalTickets = Number(this.form.value.totalTickets);
       data.seatTiers = null;
+      data.hasSeatMap = false;
     }
 
     if (this.isEdit) {
       data.status = this.form.value.status;
     }
+
+    console.log('📤 Sending data to backend:', JSON.stringify(data, null, 2));
 
     const obs = this.isEdit
       ? this.eventService.updateEvent(this.eventId!, data)
@@ -425,6 +378,7 @@ export class EventFormComponent implements OnInit {
         this.router.navigate(['/organizer']);
       },
       error: (err) => {
+        console.error('❌ Error response:', err);
         this.toastr.error(err.error?.message || 'Failed to save event.');
         this.loading = false;
       }

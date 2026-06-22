@@ -1,3 +1,5 @@
+// src/app/core/models/models.ts
+
 export interface User {
   id: string;
   email: string;
@@ -15,16 +17,15 @@ export interface AuthResponse {
   email: string;
   role: string;
   userId: number;
-  autoLogin?: boolean;  // ← Add this optional property
+  autoLogin?: boolean;
 }
 
-// src/app/core/models/models.ts
 export interface RegisterRequest {
-  name: string;        // Change from fullName to name
+  name: string;
   email: string;
   phoneNumber?: string;
   password: string;
-  role: string;        // Change from userType to role
+  role: string;
   acceptedTerms: boolean;
   acceptedTermsAt?: string;
 }
@@ -47,8 +48,9 @@ export interface Event {
   city: string;
   address?: string;
   imageUrl?: string;
+  contactEmail?: string;
   ticketPrice: number;
-  minPrice?: number;      // NEW
+  minPrice?: number;
   maxPrice?: number; 
   totalTickets: number;
   bookedTickets: number;
@@ -83,11 +85,11 @@ export interface PagedResult<T> {
 
 // ── Seat types ───────────────────────────────────────────────
  
-export type SeatTier = 'Premium' | 'Ordinary' | 'Economy';
+export type SeatTier = 'Premium' | 'Standard' | 'Economy';  // ✅ CHANGED from 'Ordinary' to 'Standard'
  
 export interface EventSeat {
   id: number;
-  seatNumber: string;   // e.g. "P-A1"
+  seatNumber: string;
   tier: SeatTier;
   price: number;
   isBooked: boolean;
@@ -123,6 +125,7 @@ export interface CreateEventRequest {
   city: string;
   address?: string;
   imageUrl?: string;
+  contactEmail?: string;
   ticketPrice: number;
   totalTickets: number;
   seatTiers?: SeatTierConfig[];
@@ -148,9 +151,9 @@ export interface Ticket {
   attendeeName: string;
   attendeeEmail: string;
   isUsed: boolean;
-  seatNumber?: string;   // NEW
-  tier?: string;         // NEW
-  seatPrice?: number;    // NEW
+  seatNumber?: string;
+  tier?: string;
+  seatPrice?: number;
   seatId?: number;
 }
 
@@ -161,7 +164,7 @@ export interface CreateBookingWithSeatsRequest {
   attendees: { name: string; email: string }[];
 }
  
-// ── Legacy flat booking (keep for backward compat) ───────────
+// ── Legacy flat booking ──────────────────────────────────────
 export interface CreateBookingRequest {
   eventId: number;
   ticketCount: number;
@@ -179,9 +182,8 @@ export const EVENT_CATEGORIES = [
   { value: 7, label: 'Other' }
 ];
 
-
 export const SEAT_TIER_COLORS: Record<SeatTier, { bg: string; text: string; border: string }> = {
   Premium:  { bg: '#ffd700', text: '#1a1200', border: '#b8960c' },
-  Ordinary: { bg: '#4f9eff', text: '#ffffff', border: '#2563eb' },
+  Standard: { bg: '#4f9eff', text: '#ffffff', border: '#2563eb' },  // ✅ CHANGED from 'Ordinary' to 'Standard'
   Economy:  { bg: '#6ee7b7', text: '#064e3b', border: '#059669' }
 };

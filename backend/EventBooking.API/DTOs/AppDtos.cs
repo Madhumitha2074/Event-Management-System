@@ -23,8 +23,15 @@ namespace EventBooking.API.DTOs
         [StringLength(30, ErrorMessage = "Phone number cannot exceed 30 characters.")]
         public string? Phone { get; set; }
 
+        [StringLength(30, ErrorMessage = "Phone number cannot exceed 30 characters.")]
+        public string? PhoneNumber { get; set; }
+
         [Range(0, 2, ErrorMessage = "Role must be 0 (User), 1 (Organizer), or 2 (Admin).")]
         public int Role { get; set; } = 0;
+
+        public bool AcceptTerms { get; set; } = false;
+        public bool PhoneVerified { get; set; } = false;
+        public string? AcceptedTermsAt { get; set; }
     }
 
     public class LoginDto
@@ -44,7 +51,7 @@ namespace EventBooking.API.DTOs
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public int UserId { get; set; }
-        public bool AutoLogin { get; set; } = false;  // ← Add this property
+        public bool AutoLogin { get; set; } = false;
     }
 
     public class UserProfileDto
@@ -55,6 +62,9 @@ namespace EventBooking.API.DTOs
         public string? Phone { get; set; }
         public string Role { get; set; } = string.Empty;
         public string CreatedAt { get; set; } = string.Empty;
+        public bool PhoneVerified { get; set; }
+        public bool AcceptTerms { get; set; }
+        public string? AcceptedTermsAt { get; set; }
     }
 
     // ─────────────────────────────────────────────
@@ -64,7 +74,7 @@ namespace EventBooking.API.DTOs
     public class SeatTierConfigDto
     {
         [Required]
-        public string Tier { get; set; } = string.Empty;  // Premium | Ordinary | Economy
+        public string Tier { get; set; } = string.Empty;
         [Range(1, 50)]
         public int Rows { get; set; }
         [Range(1, 50)]
@@ -86,6 +96,9 @@ namespace EventBooking.API.DTOs
         [Range(0, 7, ErrorMessage = "Category must be between 0 and 7.")]
         public int Category { get; set; }
 
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
+        public string? ContactEmail { get; set; }
+
         [Required(ErrorMessage = "Start date is required.")]
         public string StartDateTime { get; set; } = string.Empty;
 
@@ -102,6 +115,7 @@ namespace EventBooking.API.DTOs
 
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
+        public string? GoogleMapsUrl { get; set; }
 
         [Range(0, 99999.99, ErrorMessage = "Ticket price must be between 0 and 99,999.")]
         public decimal TicketPrice { get; set; }
@@ -109,11 +123,7 @@ namespace EventBooking.API.DTOs
         [Range(1, 100000, ErrorMessage = "Total tickets must be between 1 and 100,000.")]
         public int TotalTickets { get; set; }
 
-        // ✅ NEW — optional seat tier configuration
         public List<SeatTierConfigDto>? SeatTiers { get; set; }
-
-        // ✅ NEW — Google Maps URL for location
-        public string? GoogleMapsUrl { get; set; }
     }
 
     public class UpdateEventDto : CreateEventDto
@@ -135,6 +145,8 @@ namespace EventBooking.API.DTOs
         public string City { get; set; } = string.Empty;
         public string? Address { get; set; }
         public string? ImageUrl { get; set; }
+        public string? ContactEmail { get; set; }  // ✅ ADDED
+        public string? GoogleMapsUrl { get; set; }
         public decimal TicketPrice { get; set; }
         public decimal MinPrice { get; set; }
         public decimal MaxPrice { get; set; }
@@ -146,7 +158,6 @@ namespace EventBooking.API.DTOs
         public string CreatedAt { get; set; } = string.Empty;
         public bool HasSeatMap { get; set; }
         public string? SeatConfig { get; set; }
-        public string? GoogleMapsUrl { get; set; }  // ✅ NEW - Google Maps URL
     }
 
     public class EventFilterDto
@@ -206,7 +217,7 @@ namespace EventBooking.API.DTOs
     public class CreateBookingWithSeatsDto
     {
         [Required]
-        [Range(1, int.MaxValue)]
+        [Range(1, int.MaxValue, ErrorMessage = "EventId must be a valid event.")]
         public int EventId { get; set; }
 
         [Required]
@@ -214,14 +225,14 @@ namespace EventBooking.API.DTOs
         public List<int> SeatIds { get; set; } = new();
 
         [Required]
-        [MinLength(1)]
+        [MinLength(1, ErrorMessage = "At least one attendee is required.")]
         public List<AttendeeDto> Attendees { get; set; } = new();
     }
 
     public class AttendeeDto
     {
         [Required(ErrorMessage = "Attendee name is required.")]
-        [StringLength(150, MinimumLength = 2)]
+        [StringLength(150, MinimumLength = 2, ErrorMessage = "Name must be between 2 and 150 characters.")]
         public string Name { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Attendee email is required.")]
@@ -256,5 +267,38 @@ namespace EventBooking.API.DTOs
         public decimal? SeatPrice { get; set; }
         public string? QrCodeBase64 { get; set; }
         public byte[]? QrCodeBytes { get; set; }
+    }
+
+    // ─────────────────────────────────────────────
+    // IMAGE UPLOAD DTOs
+    // ─────────────────────────────────────────────
+
+    public class ImageUploadResponse
+    {
+        public bool Success { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public long FileSize { get; set; }
+        public string? Message { get; set; }
+    }
+
+    public class ImageUploadRequest
+    {
+        public string ImageBase64 { get; set; } = string.Empty;
+    }
+
+    public class ImageDeleteRequest
+    {
+        [Required(ErrorMessage = "Image URL is required.")]
+        public string ImageUrl { get; set; } = string.Empty;
+    }
+
+    public class ImageUploadResultDto
+    {
+        public bool Success { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? FileName { get; set; }
+        public long FileSize { get; set; }
+        public string? ErrorMessage { get; set; }
     }
 }

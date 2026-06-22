@@ -1,0 +1,104 @@
+<div class="seat-config-container">
+  <!-- Header with toggle -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0">
+      <i class="fas fa-chair me-2"></i>Seat Configuration
+    </h5>
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" 
+             id="enableSeatConfig" 
+             [checked]="enabled"
+             (change)="toggleSeatConfig($event)">
+      <label class="form-check-label" for="enableSeatConfig">
+        Enable Seat Map
+      </label>
+    </div>
+  </div>
+  
+  <!-- Info Alert -->
+  <div *ngIf="enabled" class="alert alert-info small">
+    <i class="fas fa-info-circle me-1"></i>
+    Configure different seating tiers. Total tickets will be calculated automatically.
+    Ticket price will be set to the lowest tier price.
+    <br>
+    <strong>Debug:</strong> Current tiers: {{ seatTiersArray.length || 0 }}
+  </div>
+
+  <!-- Seat Tiers -->
+  <div *ngIf="enabled">
+    <!-- Loop through tiers -->
+    <div *ngFor="let tier of seatTiersArray.controls; let i = index" 
+         class="card mb-3 bg-light">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="fw-bold mb-0">Tier {{ i + 1 }}</h6>
+          <button type="button" class="btn btn-sm btn-outline-danger"
+                  (click)="removeTier(i)">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Tier Type</label>
+            <select class="form-select form-select-sm" [value]="tier.get('tier')?.value || 'Ordinary'"
+                    (change)="tier.get('tier')?.setValue($any($event.target).value)">
+              <option value="Premium">Premium ⭐</option>
+              <option value="Ordinary">Ordinary 🪑</option>
+              <option value="Economy">Economy 💺</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Rows</label>
+            <input type="number" class="form-control form-control-sm" 
+                   [value]="tier.get('rows')?.value || 10"
+                   (input)="tier.get('rows')?.setValue($any($event.target).valueAsNumber)"
+                   min="1" max="50">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Seats Per Row</label>
+            <input type="number" class="form-control form-control-sm" 
+                   [value]="tier.get('seatsPerRow')?.value || 10"
+                   (input)="tier.get('seatsPerRow')?.setValue($any($event.target).valueAsNumber)"
+                   min="1" max="50">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Price (₹)</label>
+            <input type="number" class="form-control form-control-sm" 
+                   [value]="tier.get('price')?.value || 100"
+                   (input)="tier.get('price')?.setValue($any($event.target).valueAsNumber)"
+                   min="0" step="10">
+          </div>
+        </div>
+        
+        <div class="text-muted small mt-2">
+          <i class="fas fa-calculator me-1"></i>
+          This tier will have {{ getTierSeatCount(i) }} seats
+          ({{ tier.get('rows')?.value || 0 }} rows × {{ tier.get('seatsPerRow')?.value || 0 }} seats)
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Tier Button -->
+    <button type="button" class="btn btn-primary mt-2" 
+            (click)="addTier()">
+      <i class="fas fa-plus me-1"></i>Add Tier
+    </button>
+    
+    <!-- Summary -->
+    <div class="alert alert-secondary mt-3" *ngIf="seatTiersArray.length > 0">
+      <div class="d-flex justify-content-between">
+        <span><strong>Total Seats:</strong></span>
+        <span>{{ getTotalSeats() }}</span>
+      </div>
+      <div class="d-flex justify-content-between">
+        <span><strong>Price Range:</strong></span>
+        <span>₹{{ getMinPrice() }} - ₹{{ getMaxPrice() }}</span>
+      </div>
+      <div class="d-flex justify-content-between text-success">
+        <span><strong>Base Ticket Price:</strong></span>
+        <span>₹{{ getMinPrice() }} (lowest tier)</span>
+      </div>
+    </div>
+  </div>
+</div>

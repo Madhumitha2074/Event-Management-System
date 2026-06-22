@@ -16,9 +16,11 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="MailKit" Version="4.12.1" />
     <PackageReference Include="QuestPDF" Version="2026.5.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" /> <!-- ✅ Already installed -->
   </ItemGroup>
-<PropertyGroup>
-  <NoWarn>NU1902;NU1903</NoWarn>
-</PropertyGroup>
+
+  <PropertyGroup>
+    <NoWarn>NU1902;NU1903</NoWarn>
+  </PropertyGroup>
+
 </Project>

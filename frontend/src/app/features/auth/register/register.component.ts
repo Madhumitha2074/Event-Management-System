@@ -1,6 +1,5 @@
-// register.component.ts (corrected version)
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastrService } from 'ngx-toastr';
@@ -51,18 +50,113 @@ export class RegisterComponent implements OnInit, OnDestroy {
         Validators.maxLength(50),
         Validators.pattern('^[a-zA-Z\\s]+$')
       ]],
-      email: [''],
+      email: ['', [
+        Validators.required,
+        this.strictEmailValidator() // Now returns ValidatorFn
+      ]],
       phoneNumber: [''],
       contactMethod: ['email', Validators.required],
       password: ['', [
         Validators.required,
         Validators.minLength(8),
-        this.strongPasswordValidator()
+        this.strongPasswordValidator() // Now returns ValidatorFn
       ]],
       confirmPassword: ['', Validators.required],
       role: [0, Validators.required],
-      acceptTerms: [false]
+      acceptTerms: [false, Validators.requiredTrue]
     });
+  }
+
+  // FIXED: STRICT EMAIL VALIDATOR - Returns ValidatorFn
+  strictEmailValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value || '';
+      
+      // Check if empty
+      if (!value || value.trim() === '') {
+        return { required: true };
+      }
+      
+      // Strict enterprise email regex
+      const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      
+      // Check format
+      if (!emailPattern.test(value)) {
+        return { email: true };
+      }
+      
+      // Check for proper domain structure
+      const parts = value.split('@');
+      if (parts.length !== 2) {
+        return { email: true };
+      }
+      
+      const domain = parts[1];
+      if (!domain || !domain.includes('.')) {
+        return { email: true };
+      }
+      
+      // Check minimum length
+      if (value.length < 6) {
+        return { email: true };
+      }
+      
+      // Check for common invalid domains
+      const invalidDomains = ['example.com', 'test.com', 'domain.com'];
+      if (invalidDomains.includes(domain.toLowerCase())) {
+        return { email: true };
+      }
+      
+      return null;
+    };
+  }
+
+  // FIXED: STRONG PASSWORD VALIDATOR - Returns ValidatorFn
+  strongPasswordValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value || '';
+      
+      const hasMinLength = value.length >= 8;
+      const hasUpperCase = /[A-Z]/.test(value);
+      const hasLowerCase = /[a-z]/.test(value);
+      const hasNumber = /[0-9]/.test(value);
+      const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value);
+      
+      const isValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
+      
+      if (!isValid) {
+        return {
+          strongPassword: {
+            minLength: hasMinLength,
+            upperCase: hasUpperCase,
+            lowerCase: hasLowerCase,
+            number: hasNumber,
+            specialChar: hasSpecialChar
+          }
+        };
+      }
+      return null;
+    };
+  }
+
+  // Check if email is fully valid (for success message)
+  isEmailFullyValid(): boolean {
+    const emailControl = this.form.get('email');
+    if (!emailControl) return false;
+    
+    const value = emailControl.value || '';
+    
+    // Only show valid if:
+    // 1. Control is valid
+    // 2. Has proper format with @ and .
+    // 3. Has minimum length
+    // 4. No emailExists error
+    return emailControl.valid && 
+           value.includes('@') && 
+           value.includes('.') && 
+           value.length > 5 &&
+           !emailControl.hasError('emailExists') &&
+           !emailControl.hasError('email');
   }
 
   private setupConditionalValidation(): void {
@@ -78,7 +172,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
         phoneControl?.clearValidators();
         
         if (method === 'email') {
-          emailControl?.setValidators([Validators.required, Validators.email]);
+          emailControl?.setValidators([Validators.required, this.strictEmailValidator()]);
           phoneControl?.setValidators([]);
           this.phoneVerified = false;
           this.phoneOtpSent = false;
@@ -110,7 +204,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
       )
       .subscribe(email => {
         if (email && this.form.get('email')?.valid && this.selectedContactMethod === 'email') {
-          this.checkEmailAvailability(email);
+          // Only check availability if email has proper format
+          if (email.includes('@') && email.includes('.')) {
+            this.checkEmailAvailability(email);
+          }
         }
       });
   }
@@ -169,33 +266,6 @@ export class RegisterComponent implements OnInit, OnDestroy {
         console.log('Email availability check failed');
       }
     });
-  }
-
-  strongPasswordValidator(): ValidationErrors | null {
-    return (control: AbstractControl): ValidationErrors | null => {
-      const value = control.value || '';
-      
-      const hasMinLength = value.length >= 8;
-      const hasUpperCase = /[A-Z]/.test(value);
-      const hasLowerCase = /[a-z]/.test(value);
-      const hasNumber = /[0-9]/.test(value);
-      const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value);
-      
-      const isValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
-      
-      if (!isValid) {
-        return {
-          strongPassword: {
-            minLength: hasMinLength,
-            upperCase: hasUpperCase,
-            lowerCase: hasLowerCase,
-            number: hasNumber,
-            specialChar: hasSpecialChar
-          }
-        };
-      }
-      return null;
-    };
   }
 
   isPasswordStrong(): boolean {
@@ -350,18 +420,30 @@ export class RegisterComponent implements OnInit, OnDestroy {
     }, 1000);
   }
 
-  // FIXED: shouldShowError method with proper boolean return
+  // FIXED: shouldShowError method with proper validation logic
   shouldShowError(controlName: string): boolean {
     const control = this.form.get(controlName);
     if (!control) return false;
-    return !!control.invalid && (control.touched || control.dirty || this.submitted);
+    
+    // Always show errors after submission
+    if (this.submitted) return control.invalid;
+    
+    // For email specifically, only show after they've typed enough
+    if (controlName === 'email') {
+      const value = control.value || '';
+      // Only show error if they've typed more than 3 characters
+      // This prevents early validation on "m"
+      return control.invalid && (control.dirty || control.touched) && value.length > 3;
+    }
+    
+    return control.invalid && (control.dirty || control.touched);
   }
 
   // Helper method to clear errors
   clearFieldError(controlName: string): void {
     const control = this.form.get(controlName);
     if (control?.errors) {
-      const { required, email, pattern, invalidPhone, ...otherErrors } = control.errors;
+      const { required, email, pattern, invalidPhone, emailExists, ...otherErrors } = control.errors;
       control.setErrors(Object.keys(otherErrors).length ? otherErrors : null);
     }
   }
@@ -387,7 +469,7 @@ export class RegisterComponent implements OnInit, OnDestroy {
     
     if (contactMethod === 'email') {
       const email = this.form.get('email')?.value;
-      const emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/;
+      const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       
       if (!email || email === '') {
         this.toastr.error('Email address is required', 'Validation Error');
@@ -398,6 +480,13 @@ export class RegisterComponent implements OnInit, OnDestroy {
       }
       if (!emailPattern.test(email)) {
         this.toastr.error('Please enter a valid email address (e.g., name@example.com)', 'Validation Error');
+        this.form.get('email')?.setErrors({ email: true });
+        const emailField = document.querySelector('input[formControlName="email"]');
+        emailField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      if (!email.includes('@') || !email.includes('.')) {
+        this.toastr.error('Please enter a valid email address with @ and domain', 'Validation Error');
         this.form.get('email')?.setErrors({ email: true });
         const emailField = document.querySelector('input[formControlName="email"]');
         emailField?.scrollIntoView({ behavior: 'smooth', block: 'center' });

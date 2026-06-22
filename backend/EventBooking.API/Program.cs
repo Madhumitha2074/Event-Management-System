@@ -9,12 +9,16 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ============= ENSURE WWWROOT EXISTS =============
+// This ensures the wwwroot folder is properly set
+builder.WebHost.UseWebRoot("wwwroot");
+
 // ─────────────────────────────────────────────────────
 // SERVICES - REGISTRATION
 // ─────────────────────────────────────────────────────
 
-builder.Services.AddSingleton<DatabaseHelper>();     //AddSingleton - Creates ONE instance that lives for the entire application lifetime   
-builder.Services.AddSingleton<PdfService>();            
+builder.Services.AddSingleton<DatabaseHelper>();
+builder.Services.AddSingleton<PdfService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEventService, EventService>();
@@ -23,7 +27,10 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ISeatService, SeatService>();
 builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 
-//  camelCase JSON output — matches Angular model property names
+// ✅ Register Image Service
+builder.Services.AddScoped<IImageService, ImageService>();
+
+//  camelCase JSON output
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -48,15 +55,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
-
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"],
-
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero    //  No grace period on token expiry
+            ClockSkew = TimeSpan.Zero
         };
     });
 
@@ -71,12 +75,12 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAngular", policy =>
     {
         policy.WithOrigins(
-        "http://localhost:4200",
-        "https://localhost:4200"
+            "http://localhost:4200",
+            "https://localhost:4200"
         )
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
 });
 
@@ -93,7 +97,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Local Event Booking Platform — ASP.NET Core Web API"
     });
 
-    // Allow sending Bearer token from Swagger UI
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -111,7 +114,7 @@ builder.Services.AddSwaggerGen(c =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id   = "Bearer"
+                    Id = "Bearer"
                 }
             },
             Array.Empty<string>()
@@ -126,14 +129,13 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 // ─────────────────────────────────────────────────────
-// GLOBAL EXCEPTION HANDLER  (must be first)
+// GLOBAL EXCEPTION HANDLER
 // ─────────────────────────────────────────────────────
 
 app.UseExceptionHandler(appError =>
 {
     appError.Run(async context =>
     {
-        // ✅ Set actual HTTP status code to 500, not just the body
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/json";
 
@@ -145,10 +147,7 @@ app.UseExceptionHandler(appError =>
             {
                 statusCode = 500,
                 message = "An unexpected server error occurred.",
-                // Only expose detail in Development — hide in Production
-                detail = app.Environment.IsDevelopment()
-                                 ? error.Error.Message
-                                 : null
+                detail = app.Environment.IsDevelopment() ? error.Error.Message : null
             };
 
             await context.Response.WriteAsync(
@@ -163,32 +162,58 @@ app.UseExceptionHandler(appError =>
 });
 
 // ─────────────────────────────────────────────────────
-// MIDDLEWARE PIPELINE  (order matters)
+// MIDDLEWARE PIPELINE (ORDER MATTERS!)
 // ─────────────────────────────────────────────────────
 
-//  HTTPS redirection
-//app.UseHttpsRedirection();
+// ✅ 1. Serve static files FIRST
+app.UseStaticFiles(); // This serves files from wwwroot
 
-//  CORS before everything else that serves content
-app.UseCors("AllowAngular");
-
-//  Swagger only in Development — not exposed in Production
+// ✅ 2. Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Event Booking API v1");
-        c.RoutePrefix = "swagger";   // Access at /swagger
+        c.RoutePrefix = "swagger";
     });
 }
 
-// Auth
+// ✅ 3. CORS
+app.UseCors("AllowAngular");
+
+// ✅ 4. Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Controllers
+// ✅ 5. Controllers
 app.MapControllers();
+
+// ─────────────────────────────────────────────────────
+// ENSURE UPLOAD DIRECTORY EXISTS
+// ─────────────────────────────────────────────────────
+
+// ✅ Create upload directory
+var webRootPath = app.Environment.WebRootPath;
+Console.WriteLine($"WebRootPath: {webRootPath}");
+
+// If WebRootPath is null or empty, use the current directory + wwwroot
+if (string.IsNullOrEmpty(webRootPath))
+{
+    webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+    Console.WriteLine($"Using fallback WebRootPath: {webRootPath}");
+}
+
+var uploadPath = Path.Combine(webRootPath, "uploads", "events");
+if (!Directory.Exists(uploadPath))
+{
+    Directory.CreateDirectory(uploadPath);
+    Console.WriteLine($"✅ Created upload directory: {uploadPath}");
+}
+else
+{
+    Console.WriteLine($"✅ Upload directory exists: {uploadPath}");
+}
 
 // ─────────────────────────────────────────────────────
 // RUN

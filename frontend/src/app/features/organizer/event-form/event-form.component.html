@@ -1,0 +1,315 @@
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-5">
+          <h3 class="fw-bold mb-4">
+            <i class="fas fa-calendar-plus text-primary me-3"></i>
+            {{ isEdit ? 'Edit Event' : 'Create New Event' }}
+          </h3>
+
+          <form [formGroup]="form" (ngSubmit)="onSubmit()">
+            <div class="row g-3">
+
+              <!-- Event Title -->
+              <div class="col-12">
+                <label class="form-label">Event Title *</label>
+                <input class="form-control" formControlName="title"
+                       placeholder="Amazing Summer Concert"
+                       [class.is-invalid]="shouldShowError(title)">
+                <div *ngIf="shouldShowError(title)" class="text-danger small">
+                  <span *ngIf="title?.errors?.['required']">Title is required.</span>
+                  <span *ngIf="title?.errors?.['minlength']">Minimum 3 characters required.</span>
+                  <span *ngIf="title?.errors?.['maxlength']">Maximum 100 characters allowed.</span>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div class="col-12">
+                <label class="form-label">Description *</label>
+                <textarea class="form-control" formControlName="description"
+                          rows="4" placeholder="Describe your event..."
+                          [class.is-invalid]="shouldShowError(description)"></textarea>
+                <div *ngIf="shouldShowError(description)" class="text-danger small">
+                  <span *ngIf="description?.errors?.['required']">Description is required.</span>
+                  <span *ngIf="description?.errors?.['minlength']">Minimum 10 characters required.</span>
+                  <span *ngIf="description?.errors?.['maxlength']">Maximum 2000 characters allowed.</span>
+                </div>
+              </div>
+
+              <!-- Category -->
+              <div class="col-md-6">
+                <label class="form-label">Category *</label>
+                <select class="form-select" formControlName="category">
+                  <option *ngFor="let cat of categories" [value]="cat.value">
+                    {{ cat.label }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Contact Email -->
+              <div class="col-md-6">
+                <label class="form-label">Contact Email *</label>
+                <input type="email" class="form-control" formControlName="contactEmail"
+                       placeholder="organizer@example.com"
+                       [class.is-invalid]="shouldShowError(contactEmail)">
+                <div *ngIf="shouldShowError(contactEmail)" class="text-danger small">
+                  <span *ngIf="contactEmail?.errors?.['required']">Email is required.</span>
+                  <span *ngIf="contactEmail?.errors?.['pattern']">Please enter a valid email address.</span>
+                </div>
+              </div>
+
+              <!-- Image Upload -->
+              <div class="col-12">
+                <label class="form-label">Event Image</label>
+                <app-image-upload
+                  [imageUrl]="form.get('imageUrl')?.value"
+                  [imageControl]="imageUrl"
+                  (imageUploaded)="onImageUploaded($event)"
+                  (imageRemoved)="onImageRemoved()">
+                </app-image-upload>
+                <div *ngIf="imageUrl?.touched && imageUrl?.invalid" class="text-danger small">
+                  <span *ngIf="imageUrl?.errors?.['invalidImageUrl']">Please enter a valid image URL (jpg, png, gif, etc.)</span>
+                </div>
+              </div>
+
+              <!-- Date & Time -->
+              <div class="col-md-6">
+                <label class="form-label">Start Date & Time *</label>
+                <input type="datetime-local" class="form-control" formControlName="startDateTime"
+                       [class.is-invalid]="shouldShowError(startDateTime) || (form.errors?.['pastDate'] && formSubmitted)">
+                <div *ngIf="shouldShowError(startDateTime)" class="text-danger small">
+                  <span *ngIf="startDateTime?.errors?.['required']">Start date is required.</span>
+                </div>
+                <div *ngIf="form.errors?.['pastDate'] && formSubmitted" class="text-danger small">
+                  <i class="fas fa-exclamation-circle me-1"></i>
+                  Start date must be in the future!
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">End Date & Time *</label>
+                <input type="datetime-local" class="form-control" formControlName="endDateTime"
+                       [class.is-invalid]="shouldShowError(endDateTime)">
+                <div *ngIf="shouldShowError(endDateTime)" class="text-danger small">
+                  <span *ngIf="endDateTime?.errors?.['required']">End date is required.</span>
+                  <span *ngIf="form?.errors?.['dateRange']">End date must be after start date.</span>
+                </div>
+              </div>
+
+              <!-- Venue -->
+              <div class="col-md-6">
+                <label class="form-label">Venue *</label>
+                <input class="form-control" formControlName="venue"
+                       placeholder="Madison Square Garden"
+                       [class.is-invalid]="shouldShowError(venue)">
+                <div *ngIf="shouldShowError(venue)" class="text-danger small">
+                  <span *ngIf="venue?.errors?.['required']">Venue is required.</span>
+                  <span *ngIf="venue?.errors?.['minlength']">Venue must be at least 2 characters.</span>
+                </div>
+              </div>
+
+              <!-- City -->
+              <div class="col-md-6">
+                <label class="form-label">City *</label>
+                <input class="form-control" formControlName="city"
+                       placeholder="Chennai"
+                       [class.is-invalid]="shouldShowError(city)">
+                <div *ngIf="shouldShowError(city)" class="text-danger small">
+                  <span *ngIf="city?.errors?.['required']">City is required.</span>
+                  <span *ngIf="city?.errors?.['minlength']">City must be at least 2 characters.</span>
+                </div>
+              </div>
+
+              <!-- Address -->
+              <div class="col-12">
+                <label class="form-label">Full Address</label>
+                <input class="form-control" formControlName="address"
+                       placeholder="123 Main Street, Chennai">
+              </div>
+
+              <!-- Google Maps Link -->
+              <div class="col-12">
+                <label class="form-label">
+                  <i class="fab fa-google me-1 text-danger"></i>
+                  Google Maps Location Link 
+                  <small class="text-muted">(Optional)</small>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="fas fa-map-marker-alt text-danger"></i>
+                  </span>
+                  <input type="url" class="form-control" formControlName="googleMapsUrl" 
+                         placeholder="https://maps.google.com/?q=YMCA+Nandanam+Chennai">
+                  <button class="btn btn-outline-secondary" type="button" 
+                          (click)="openGoogleMapsHelp()" title="How to get Google Maps link">
+                    <i class="fas fa-question"></i>
+                  </button>
+                </div>
+                <small class="text-muted d-block mt-1">
+                  <i class="fas fa-info-circle me-1"></i>
+                  How to get link: Open Google Maps → Search for venue → Click "Share" → Copy link
+                </small>
+              </div>
+
+              <!-- ════════════════════════════════════════════════ -->
+              <!-- SEAT CONFIGURATION - WITH TOGGLE BUTTON         -->
+              <!-- ════════════════════════════════════════════════ -->
+              <div class="col-12 mt-4">
+                <div class="seat-config-section">
+                  <!-- Toggle Button - Always Visible -->
+                  <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded-3">
+                    <div>
+                      <h5 class="fw-bold mb-0">
+                        <i class="fas fa-chair me-2 text-primary"></i>Seat Configuration
+                      </h5>
+                      <small class="text-muted">Configure seating tiers for your event</small>
+                    </div>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" 
+                             id="enableSeatConfig" 
+                             [checked]="enableSeatConfig"
+                             (change)="toggleSeatConfig($event)"
+                             style="width: 3rem; height: 1.5rem; cursor: pointer;">
+                      <label class="form-check-label ms-2 fw-semibold" for="enableSeatConfig" style="cursor: pointer;">
+                        {{ enableSeatConfig ? '✅ Enabled' : '❌ Disabled' }}
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Seat Configuration Content (shown only when enabled) -->
+                  <div *ngIf="enableSeatConfig" class="seat-config-content">
+                    <div class="alert alert-info small">
+                      <i class="fas fa-info-circle me-1"></i>
+                      Configure different seating tiers. Total tickets will be calculated automatically.
+                      Ticket price will be set to the lowest tier price.
+                      <br>
+                      <strong>Current tiers:</strong> {{ seatTiersArray.length || 0 }}
+                    </div>
+
+                    <!-- Seat Tiers -->
+                    <div *ngFor="let tier of seatTiersArray.controls; let i = index" 
+                         [formGroup]="$any(tier)" class="card mb-3 bg-light">
+                      <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                          <h6 class="fw-bold mb-0">Tier {{ i + 1 }}</h6>
+                          <button type="button" class="btn btn-sm btn-outline-danger"
+                                  (click)="removeTier(i)">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+
+                        <div class="row g-2">
+                          <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Tier Type</label>
+                            <select class="form-select form-select-sm" formControlName="tier">
+                              <option value="Premium">Premium ⭐</option>
+                              <option value="Standard">Standard 🪑</option>
+                              <option value="Economy">Economy 💺</option>
+                            </select>
+                          </div>
+                          <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Rows</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   formControlName="rows" min="1" max="50">
+                          </div>
+                          <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Seats Per Row</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   formControlName="seatsPerRow" min="1" max="50">
+                          </div>
+                          <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Price (₹)</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   formControlName="price" min="0" step="10">
+                          </div>
+                        </div>
+                        
+                        <div class="text-muted small mt-2">
+                          <i class="fas fa-calculator me-1"></i>
+                          This tier will have {{ getTierSeatCount(i) }} seats
+                          ({{ tier.get('rows')?.value || 0 }} rows × {{ tier.get('seatsPerRow')?.value || 0 }} seats)
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Add Tier Button -->
+                    <button type="button" class="btn btn-primary mt-2" 
+                            (click)="addTier()">
+                      <i class="fas fa-plus me-1"></i>Add Tier
+                    </button>
+                    
+                    <!-- Summary -->
+                    <div class="alert alert-secondary mt-3" *ngIf="seatTiersArray.length > 0">
+                      <div class="d-flex justify-content-between">
+                        <span><strong>Total Seats:</strong></span>
+                        <span>{{ getTotalSeats() }}</span>
+                      </div>
+                      <div class="d-flex justify-content-between">
+                        <span><strong>Price Range:</strong></span>
+                        <span>₹{{ getMinPrice() }} - ₹{{ getMaxPrice() }}</span>
+                      </div>
+                      <div class="d-flex justify-content-between text-success">
+                        <span><strong>Base Ticket Price:</strong></span>
+                        <span>₹{{ getMinPrice() }} (lowest tier)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Traditional fields (hidden when seat config is enabled) -->
+              <div *ngIf="!enableSeatConfig" class="row">
+                <div class="col-md-6">
+                  <label class="form-label">Ticket Price (₹) *</label>
+                  <input type="number" class="form-control" formControlName="ticketPrice"
+                         placeholder="0 for free" min="0"
+                         [class.is-invalid]="shouldShowError(ticketPrice)">
+                  <div *ngIf="shouldShowError(ticketPrice)" class="text-danger small">
+                    <span *ngIf="ticketPrice?.errors?.['required']">Ticket price is required.</span>
+                    <span *ngIf="ticketPrice?.errors?.['min']">Price must be 0 or greater.</span>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Total Tickets *</label>
+                  <input type="number" class="form-control" formControlName="totalTickets"
+                         placeholder="100" min="1"
+                         [class.is-invalid]="shouldShowError(totalTickets)">
+                  <div *ngIf="shouldShowError(totalTickets)" class="text-danger small">
+                    <span *ngIf="totalTickets?.errors?.['required']">Total tickets is required.</span>
+                    <span *ngIf="totalTickets?.errors?.['min']">Minimum 1 ticket required.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Status (Edit mode only) -->
+              <div *ngIf="isEdit" class="col-12">
+                <label class="form-label">Status</label>
+                <select class="form-select" formControlName="status">
+                  <option value="Draft">Draft</option>
+                  <option value="Published">Published</option>
+                  <option value="Cancelled">Cancelled</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-3 mt-4">
+              <button class="btn btn-primary px-4" type="submit" [disabled]="loading || form.invalid">
+                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+                {{ isEdit ? 'Update Event' : 'Create Event' }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary px-4" 
+                      (click)="goToOrganizer()">
+                Cancel
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

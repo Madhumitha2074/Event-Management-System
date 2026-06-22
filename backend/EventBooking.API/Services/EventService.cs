@@ -19,6 +19,13 @@ namespace EventBooking.API.Services
     {
         private readonly DatabaseHelper _db;
 
+        // ✅ Add this JsonSerializerOptions for camelCase serialization
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+
         // Category map — Angular sends int (0-7), DB stores string
         private static readonly string[] CategoryNames =
         {
@@ -138,6 +145,7 @@ namespace EventBooking.API.Services
                        e.City,
                        e.Address,
                        e.ImageUrl,
+                       e.ContactEmail,
                        e.TicketPrice,
                        e.TotalTickets,
                        e.BookedTickets,
@@ -191,6 +199,7 @@ namespace EventBooking.API.Services
                        e.City,
                        e.Address,
                        e.ImageUrl,
+                       e.ContactEmail,
                        e.TicketPrice,
                        e.TotalTickets,
                        e.BookedTickets,
@@ -244,12 +253,15 @@ namespace EventBooking.API.Services
                 string? seatConfigJson = null;
                 int totalTickets = dto.TotalTickets;
                 decimal ticketPrice = dto.TicketPrice;
+                bool hasSeatMap = false;
                 
                 if (dto.SeatTiers != null && dto.SeatTiers.Any())
                 {
-                    seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers);
+                    // ✅ Use camelCase serialization
+                    seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers, JsonOptions);
                     totalTickets = dto.SeatTiers.Sum(t => t.Rows * t.SeatsPerRow);
                     ticketPrice = dto.SeatTiers.Min(t => t.Price);
+                    hasSeatMap = true;
                 }
 
                 string query = @"
@@ -257,13 +269,15 @@ namespace EventBooking.API.Services
                         (Title, Description, Category, Status,
                          StartDateTime, EndDateTime, Venue, City,
                          Address, ImageUrl, TicketPrice, TotalTickets,
-                         BookedTickets, OrganizerId, SeatConfig, GoogleMapsUrl)
+                         BookedTickets, OrganizerId, SeatConfig, 
+                         GoogleMapsUrl, ContactEmail, HasSeatMap, CreatedAt, UpdatedAt)
                     OUTPUT INSERTED.Id
                     VALUES
                         (@Title, @Description, @Category, 'Draft',
                          @StartDateTime, @EndDateTime, @Venue, @City,
                          @Address, @ImageUrl, @TicketPrice, @TotalTickets,
-                         0, @OrganizerId, @SeatConfig, @GoogleMapsUrl)";
+                         0, @OrganizerId, @SeatConfig, 
+                         @GoogleMapsUrl, @ContactEmail, @HasSeatMap, @CreatedAt, @UpdatedAt)";
 
                 using var cmd = new SqlCommand(query, connection, transaction);
 
@@ -282,7 +296,13 @@ namespace EventBooking.API.Services
                 cmd.Parameters.AddWithValue("@TotalTickets", totalTickets);
                 cmd.Parameters.AddWithValue("@OrganizerId", organizerId);
                 cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@GoogleMapsUrl", dto.GoogleMapsUrl ?? (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("@GoogleMapsUrl", 
+                    string.IsNullOrWhiteSpace(dto.GoogleMapsUrl) ? (object)DBNull.Value : dto.GoogleMapsUrl.Trim());
+                cmd.Parameters.AddWithValue("@ContactEmail", 
+                    string.IsNullOrWhiteSpace(dto.ContactEmail) ? (object)DBNull.Value : dto.ContactEmail.Trim());
+                cmd.Parameters.AddWithValue("@HasSeatMap", hasSeatMap);
+                cmd.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow);
+                cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
 
                 var scalar = await cmd.ExecuteScalarAsync();
                 int eventId = Convert.ToInt32(scalar);
@@ -325,7 +345,7 @@ namespace EventBooking.API.Services
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
 
-            // ✅ Verify ownership first
+            // Verify ownership first
             string ownerCheck = @"
                 SELECT COUNT(1) FROM Events
                 WHERE Id = @Id AND OrganizerId = @OrganizerId";
@@ -342,9 +362,12 @@ namespace EventBooking.API.Services
 
             // Calculate seat config if provided
             string? seatConfigJson = null;
+            bool hasSeatMap = false;
             if (dto.SeatTiers != null && dto.SeatTiers.Any())
             {
-                seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers);
+                // ✅ Use camelCase serialization
+                seatConfigJson = JsonSerializer.Serialize(dto.SeatTiers, JsonOptions);
+                hasSeatMap = true;
             }
 
             string query = @"
@@ -363,6 +386,8 @@ namespace EventBooking.API.Services
                        TotalTickets  = @TotalTickets,
                        SeatConfig    = @SeatConfig,
                        GoogleMapsUrl = @GoogleMapsUrl,
+                       ContactEmail  = @ContactEmail,
+                       HasSeatMap    = @HasSeatMap,
                        UpdatedAt     = @UpdatedAt
                 WHERE  Id = @Id AND OrganizerId = @OrganizerId";
 
@@ -385,7 +410,11 @@ namespace EventBooking.API.Services
             cmd.Parameters.AddWithValue("@TicketPrice", dto.TicketPrice);
             cmd.Parameters.AddWithValue("@TotalTickets", dto.TotalTickets);
             cmd.Parameters.AddWithValue("@SeatConfig", seatConfigJson ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@GoogleMapsUrl", dto.GoogleMapsUrl ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@GoogleMapsUrl",
+                string.IsNullOrWhiteSpace(dto.GoogleMapsUrl) ? (object)DBNull.Value : dto.GoogleMapsUrl.Trim());
+            cmd.Parameters.AddWithValue("@ContactEmail",
+                string.IsNullOrWhiteSpace(dto.ContactEmail) ? (object)DBNull.Value : dto.ContactEmail.Trim());
+            cmd.Parameters.AddWithValue("@HasSeatMap", hasSeatMap);
             cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
 
             await cmd.ExecuteNonQueryAsync();
@@ -400,7 +429,6 @@ namespace EventBooking.API.Services
                 }
                 catch (InvalidOperationException ex)
                 {
-                    // Seat regeneration failed due to existing bookings - just update event info
                     Console.WriteLine($"Warning: Could not regenerate seats: {ex.Message}");
                 }
             }
@@ -409,7 +437,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // DELETE EVENT (Properly handles all foreign key constraints)
+        // DELETE EVENT
         // ─────────────────────────────────────────────
         public async Task DeleteEventAsync(int id, int organizerId)
         {
@@ -419,7 +447,7 @@ namespace EventBooking.API.Services
 
             try
             {
-                // ✅ Verify organizer owns the event
+                // Verify organizer owns the event
                 string ownerCheck = @"
                     SELECT COUNT(1) FROM Events
                     WHERE Id = @Id AND OrganizerId = @OrganizerId";
@@ -453,7 +481,7 @@ namespace EventBooking.API.Services
 
                 // Delete in correct order to avoid foreign key conflicts
                 
-                // 1. Delete tickets (through bookings)
+                // 1. Delete tickets
                 string deleteTicketsQuery = @"
                     DELETE FROM Tickets 
                     WHERE BookingId IN (SELECT Id FROM Bookings WHERE EventId = @EventId)";
@@ -502,7 +530,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // GET ORGANIZER EVENTS  (dashboard)
+        // GET ORGANIZER EVENTS
         // ─────────────────────────────────────────────
         public async Task<List<EventDto>> GetOrganizerEventsAsync(int organizerId)
         {
@@ -523,6 +551,7 @@ namespace EventBooking.API.Services
                        e.City,
                        e.Address,
                        e.ImageUrl,
+                       e.ContactEmail,
                        e.TicketPrice,
                        e.TotalTickets,
                        e.BookedTickets,
@@ -555,24 +584,21 @@ namespace EventBooking.API.Services
         {
             string categoryString = reader["Category"].ToString()!;
 
-            // Convert category string back to index for Angular form dropdown
             int categoryIndex = Array.IndexOf(CategoryNames, categoryString);
             if (categoryIndex < 0) categoryIndex = 7;
 
             string? seatConfig = reader["SeatConfig"] == DBNull.Value ? null : reader["SeatConfig"].ToString();
             string? googleMapsUrl = reader["GoogleMapsUrl"] == DBNull.Value ? null : reader["GoogleMapsUrl"].ToString();
+            string? contactEmail = reader["ContactEmail"] == DBNull.Value ? null : reader["ContactEmail"].ToString();
             
-            // Calculate min and max prices from seat configuration
             decimal ticketPrice = Convert.ToDecimal(reader["TicketPrice"]);
             decimal minPrice = ticketPrice;
             decimal maxPrice = ticketPrice;
             
-            // If seat config exists, parse it to get actual price range
             if (!string.IsNullOrEmpty(seatConfig))
             {
                 try
                 {
-                    // Try to deserialize as array directly
                     var tiers = JsonSerializer.Deserialize<List<SeatTierConfigDto>>(seatConfig);
                     if (tiers != null && tiers.Any())
                     {
@@ -582,7 +608,6 @@ namespace EventBooking.API.Services
                 }
                 catch
                 {
-                    // If that fails, try with wrapper object { "seatTiers": [...] }
                     try
                     {
                         using JsonDocument doc = JsonDocument.Parse(seatConfig);
@@ -617,6 +642,7 @@ namespace EventBooking.API.Services
                 City = reader["City"].ToString()!,
                 Address = reader["Address"] == DBNull.Value ? null : reader["Address"].ToString(),
                 ImageUrl = reader["ImageUrl"] == DBNull.Value ? null : reader["ImageUrl"].ToString(),
+                ContactEmail = contactEmail,
                 TicketPrice = ticketPrice,
                 MinPrice = minPrice,
                 MaxPrice = maxPrice,
