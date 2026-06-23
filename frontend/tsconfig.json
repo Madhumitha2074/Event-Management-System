@@ -1,9 +1,7 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "rootDir": "./src",
-    //"ignoreDeprecations": "6.0",
     "outDir": "./dist/out-tsc",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -23,14 +21,14 @@
     "useDefineForClassFields": false,
     "lib": ["ES2022", "dom"],
     "paths": {
-      "@services/*": ["src/app/core/services/*"],
-      "@models/*": ["src/app/core/models/*"],
-      "@guards/*": ["src/app/core/guards/*"],
-      "@interceptors/*": ["src/app/core/interceptors/*"],
-      "@shared/*": ["src/app/shared/*"],
-      "@environments/*": ["src/environments/*"],
-      "@core/*": ["src/app/core/*"],
-      "@features/*": ["src/app/features/*"]
+      "@services/*": ["./src/app/core/services/*"],
+      "@models/*": ["./src/app/core/models/*"],
+      "@guards/*": ["./src/app/core/guards/*"],
+      "@interceptors/*": ["./src/app/core/interceptors/*"],
+      "@shared/*": ["./src/app/shared/*"],
+      "@environments/*": ["./src/environments/*"],
+      "@core/*": ["./src/app/core/*"],
+      "@features/*": ["./src/app/features/*"]
     }
   },
   "angularCompilerOptions": {

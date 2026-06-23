@@ -53,7 +53,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // GET ALL EVENTS (with filters + pagination)
+        // GET ALL EVENTS (with filters + pagination + ShowLive)
         // ─────────────────────────────────────────────
         public async Task<PagedResultDto<EventDto>> GetEventsAsync(EventFilterDto filter)
         {
@@ -126,7 +126,7 @@ namespace EventBooking.API.Services
                 paramValues.Add(("@MaxPrice", filter.MaxPrice.Value));
             }
 
-            // ✅ Live events filter (only for active events, not expired)
+            // ✅ Live events filter - only show events happening NOW
             if (filter.ShowLive && !filter.IncludeExpired)
             {
                 conditions.Add("e.StartDateTime <= GETUTCDATE() AND e.EndDateTime >= GETUTCDATE()");
@@ -257,7 +257,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // CREATE EVENT (with seat configuration support)
+        // ✅ CREATE EVENT (with seat configuration support)
         // ─────────────────────────────────────────────
         public async Task<EventDto> CreateEventAsync(CreateEventDto dto, int organizerId)
         {
@@ -303,6 +303,8 @@ namespace EventBooking.API.Services
                     totalTickets = dto.SeatTiers.Sum(t => t.Rows * t.SeatsPerRow);
                     ticketPrice = dto.SeatTiers.Min(t => t.Price);
                     hasSeatMap = true;
+                    
+                    _logger?.LogInformation($"✅ Seat configuration detected: {dto.SeatTiers.Count} tiers, {totalTickets} total seats");
                 }
 
                 string query = @"
@@ -347,11 +349,15 @@ namespace EventBooking.API.Services
 
                 var scalar = await cmd.ExecuteScalarAsync();
                 int eventId = Convert.ToInt32(scalar);
+                _logger?.LogInformation($"✅ Event created with ID: {eventId}");
 
+                // ✅ GENERATE SEATS IF SEAT TIERS ARE PROVIDED
                 if (dto.SeatTiers != null && dto.SeatTiers.Any())
                 {
+                    _logger?.LogInformation($"🪑 Generating seats for event {eventId}...");
                     var seatService = new SeatService(_db);
                     await seatService.GenerateSeatsAsync(eventId, dto.SeatTiers, connection, transaction);
+                    _logger?.LogInformation($"✅ Seats generated successfully for event {eventId}");
                 }
 
                 await transaction.CommitAsync();
@@ -365,7 +371,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // UPDATE EVENT
+        // UPDATE EVENT (with seat regeneration)
         // ─────────────────────────────────────────────
         public async Task<EventDto> UpdateEventAsync(int id, UpdateEventDto dto, int organizerId)
         {
@@ -488,12 +494,15 @@ namespace EventBooking.API.Services
 
             await cmd.ExecuteNonQueryAsync();
 
+            // ✅ Regenerate seats if seat tiers are provided
             if (dto.SeatTiers != null && dto.SeatTiers.Any())
             {
                 var seatService = new SeatService(_db);
                 try
                 {
+                    _logger?.LogInformation($"🪑 Regenerating seats for event {id}...");
                     await seatService.RegenerateSeatsAsync(id, dto.SeatTiers);
+                    _logger?.LogInformation($"✅ Seats regenerated successfully for event {id}");
                 }
                 catch (InvalidOperationException ex)
                 {

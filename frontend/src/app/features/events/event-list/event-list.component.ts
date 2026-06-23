@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { EventService } from '../../../core/services/event.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Event, EventFilter, PagedResult, EVENT_CATEGORIES } from '../../../core/models/models';
-import { debounceTime, distinctUntilChanged, Subject, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 
 @Component({
@@ -262,7 +262,7 @@ import { ToastrService } from 'ngx-toastr';
         <!-- ── Event Grid ── -->
         <div class="col-lg-9">
 
-          <!-- ✅ Simple event count -->
+          <!-- Event count -->
           <div class="d-flex justify-content-between align-items-center mb-3">
             <span class="results-count">
               <i class="fas fa-list me-1"></i>
@@ -281,16 +281,18 @@ import { ToastrService } from 'ngx-toastr';
             </div>
           </div>
 
-          <!-- ✅ Clean status bar - only timestamp -->
+          <!-- Last updated -->
           <div *ngIf="lastUpdated" class="text-muted small mb-3">
             <i class="fas fa-sync-alt me-1" [class.spin]="loading"></i>
             Last updated: {{ lastUpdated | date:'h:mm:ss a' }}
           </div>
 
+          <!-- Loading -->
           <div *ngIf="loading" class="text-center py-5">
             <div class="spinner-border text-primary"></div>
           </div>
 
+          <!-- No events -->
           <div *ngIf="!loading && events.length === 0" class="text-center py-5">
             <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
             <h5 class="text-muted">No events found</h5>
@@ -300,9 +302,9 @@ import { ToastrService } from 'ngx-toastr';
             </button>
           </div>
 
+          <!-- Event Cards -->
           <div class="row g-4" *ngIf="!loading && events.length > 0">
             <div class="col-md-4" *ngFor="let event of events">
-              <!-- ✅ Event Card - shows expired status properly -->
               <div class="card event-card h-100" [class.expired]="!event.isActive">
                 <div class="card-img-wrapper">
                   <img
@@ -317,12 +319,10 @@ import { ToastrService } from 'ngx-toastr';
                     {{ event.availableTickets }}
                   </div>
                   
-                  <!-- ✅ LIVE badge for ongoing events -->
                   <div *ngIf="event.isActive && isEventLive(event)" class="status-overlay live">
                     <i class="fas fa-broadcast"></i> LIVE
                   </div>
                   
-                  <!-- ✅ EXPIRED overlay for expired events -->
                   <div *ngIf="!event.isActive" class="status-overlay expired">
                     <i class="fas fa-clock"></i> ENDED
                   </div>
@@ -359,7 +359,7 @@ import { ToastrService } from 'ngx-toastr';
                     {{ event.venue }}, {{ event.city }}
                   </p>
                   
-                  <!-- ✅ Date only - NO time remaining -->
+                  <!-- Date -->
                   <p class="event-date">
                     <i class="far fa-calendar-alt me-1"></i>
                     <strong>{{ event.startDateTime | date:'EEE, MMM d, y' }}</strong>
@@ -375,7 +375,7 @@ import { ToastrService } from 'ngx-toastr';
                     {{ event.description | slice:0:70 }}...
                   </p>
                   
-                  <!-- Footer -->
+                  <!-- ✅ UPDATED: Footer with fixed Book Now button -->
                   <div class="event-footer">
                     <div class="tickets-left">
                       <span class="dot" [class.sold-out]="event.availableTickets === 0" [class.expired-dot]="!event.isActive"></span>
@@ -386,15 +386,18 @@ import { ToastrService } from 'ngx-toastr';
                         Event Ended
                       </span>
                     </div>
-                    <!-- ✅ Disabled "Book Now" for expired events -->
+                    <!-- ✅ FIXED: Book Now button with proper navigation -->
                     <a 
-                      [routerLink]="event.isActive ? ['/events', event.id] : '#'" 
-                      class="btn-book-now" 
-                      [class.disabled]="!event.isActive"
-                      (click)="!event.isActive && $event.preventDefault()">
+                      *ngIf="event.isActive && event.availableTickets > 0"
+                      [routerLink]="['/events', event.id]" 
+                      class="btn-book-now"
+                      (click)="onBookNowClick(event.id)">
                       <i class="fas fa-ticket-alt me-1"></i> 
-                      {{ event.isActive ? 'Book Now' : 'Ended' }}
+                      Book Now
                     </a>
+                    <span *ngIf="!event.isActive || event.availableTickets === 0" class="text-muted">
+                      {{ event.availableTickets === 0 ? 'Sold Out' : 'Ended' }}
+                    </span>
                   </div>
                   
                 </div>
@@ -406,8 +409,7 @@ import { ToastrService } from 'ngx-toastr';
           <nav *ngIf="result && result.totalPages > 1" class="mt-4">
             <ul class="pagination justify-content-center">
               <li class="page-item" [class.disabled]="filter.page === 1">
-                <button class="page-link"
-                  (click)="changePage((filter.page || 1) - 1)">
+                <button class="page-link" (click)="changePage((filter.page || 1) - 1)">
                   <i class="fas fa-chevron-left"></i> Previous
                 </button>
               </li>
@@ -418,10 +420,8 @@ import { ToastrService } from 'ngx-toastr';
               >
                 <button class="page-link" (click)="changePage(p)">{{ p }}</button>
               </li>
-              <li class="page-item"
-                  [class.disabled]="result && filter.page === result.totalPages">
-                <button class="page-link"
-                  (click)="changePage((filter.page || 1) + 1)">
+              <li class="page-item" [class.disabled]="result && filter.page === result.totalPages">
+                <button class="page-link" (click)="changePage((filter.page || 1) + 1)">
                   Next <i class="fas fa-chevron-right"></i>
                 </button>
               </li>
@@ -545,7 +545,7 @@ import { ToastrService } from 'ngx-toastr';
     .deco-circle.d3 { width: 100px; height: 100px; bottom: 20%; right: 10%; }
 
     /* ════════════════════════════════════════════════════════════════
-       FILTER SIDEBAR - MODERN REDESIGN
+       FILTER SIDEBAR
        ════════════════════════════════════════════════════════════════ */
     .filter-sidebar {
       background: #ffffff;
@@ -557,11 +557,9 @@ import { ToastrService } from 'ngx-toastr';
       border: 1px solid rgba(0, 0, 0, 0.04);
       transition: all 0.3s ease;
     }
-
     .filter-sidebar:hover {
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
     }
-
     .filter-header {
       display: flex;
       align-items: center;
@@ -569,33 +567,26 @@ import { ToastrService } from 'ngx-toastr';
       border-bottom: 2px solid #f0f2f5;
       margin-bottom: 20px;
     }
-
     .filter-header h5 {
       font-weight: 700;
       color: #1a1a2e;
       font-size: 1rem;
     }
-
     .filter-header .btn-link {
       font-size: 0.75rem;
       text-decoration: none;
       color: #6c757d;
       font-weight: 500;
     }
-
     .filter-header .btn-link:hover {
       color: #dc3545;
     }
-
-    /* ── Filter Groups ── */
     .filter-group {
       margin-bottom: 18px;
     }
-
     .filter-group:last-of-type {
       margin-bottom: 20px;
     }
-
     .filter-label {
       display: block;
       font-size: 0.75rem;
@@ -605,13 +596,10 @@ import { ToastrService } from 'ngx-toastr';
       letter-spacing: 0.5px;
       margin-bottom: 6px;
     }
-
     .filter-label i {
       color: #6c5ce7;
       width: 16px;
     }
-
-    /* ── Input Styles ── */
     .filter-input {
       border-radius: 10px;
       border: 1.5px solid #e2e8f0;
@@ -620,18 +608,15 @@ import { ToastrService } from 'ngx-toastr';
       transition: all 0.3s ease;
       background: #f8fafc;
     }
-
     .filter-input:focus {
       border-color: #6c5ce7;
       box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
       background: #ffffff;
     }
-
     .filter-input::placeholder {
       color: #a0aec0;
       font-size: 0.8rem;
     }
-
     .filter-select {
       border-radius: 10px;
       border: 1.5px solid #e2e8f0;
@@ -641,18 +626,14 @@ import { ToastrService } from 'ngx-toastr';
       cursor: pointer;
       transition: all 0.3s ease;
     }
-
     .filter-select:focus {
       border-color: #6c5ce7;
       box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
       background: #ffffff;
     }
-
-    /* ── Input with Icon ── */
     .input-with-icon {
       position: relative;
     }
-
     .input-with-icon .input-icon {
       position: absolute;
       left: 12px;
@@ -661,11 +642,9 @@ import { ToastrService } from 'ngx-toastr';
       color: #a0aec0;
       font-size: 0.8rem;
     }
-
     .input-with-icon .filter-input {
       padding-left: 34px;
     }
-
     .input-with-icon .clear-btn {
       position: absolute;
       right: 10px;
@@ -674,12 +653,9 @@ import { ToastrService } from 'ngx-toastr';
       font-size: 0.7rem;
       color: #a0aec0;
     }
-
     .input-with-icon .clear-btn:hover {
       color: #dc3545;
     }
-
-    /* ── Price Input with Prefix ── */
     .input-prefix {
       position: absolute;
       left: 12px;
@@ -690,32 +666,26 @@ import { ToastrService } from 'ngx-toastr';
       font-size: 0.85rem;
       z-index: 2;
     }
-
     .filter-input.with-prefix {
       padding-left: 28px;
     }
-
-    /* ── Toggle Switches ── */
     .toggle-group {
       background: #f8fafc;
       border-radius: 12px;
       padding: 14px 16px;
       border: 1px solid #e2e8f0;
     }
-
     .toggle-item {
       display: flex;
       align-items: center;
       gap: 12px;
       padding: 6px 0;
     }
-
     .toggle-item:not(:last-child) {
       border-bottom: 1px solid #e2e8f0;
       padding-bottom: 10px;
       margin-bottom: 10px;
     }
-
     .toggle-switch {
       position: relative;
       display: inline-block;
@@ -723,13 +693,11 @@ import { ToastrService } from 'ngx-toastr';
       height: 24px;
       flex-shrink: 0;
     }
-
     .toggle-switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
-
     .toggle-slider {
       position: absolute;
       cursor: pointer;
@@ -741,7 +709,6 @@ import { ToastrService } from 'ngx-toastr';
       transition: 0.4s;
       border-radius: 24px;
     }
-
     .toggle-slider::before {
       content: '';
       position: absolute;
@@ -754,46 +721,37 @@ import { ToastrService } from 'ngx-toastr';
       border-radius: 50%;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     }
-
     .toggle-switch input:checked + .toggle-slider {
       background: #6c5ce7;
     }
-
     .toggle-switch input:checked + .toggle-slider::before {
       transform: translateX(20px);
     }
-
     .toggle-slider-live {
       background: #cbd5e0;
     }
-
     .toggle-switch input:checked + .toggle-slider-live {
       background: #dc3545;
     }
-
     .toggle-label {
       flex: 1;
       min-width: 0;
     }
-
     .toggle-title {
       display: block;
       font-size: 0.85rem;
       font-weight: 600;
       color: #2d3748;
     }
-
     .toggle-title i {
       font-size: 0.8rem;
     }
-
     .toggle-sub {
       display: block;
       font-size: 0.7rem;
       color: #a0aec0;
       margin-top: 1px;
     }
-
     .live-dot {
       display: inline-block;
       width: 6px;
@@ -803,20 +761,16 @@ import { ToastrService } from 'ngx-toastr';
       margin-right: 4px;
       animation: pulse-dot-live 1.2s ease-in-out infinite;
     }
-
     @keyframes pulse-dot-live {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.4; transform: scale(0.8); }
     }
-
-    /* ── Action Buttons ── */
     .filter-actions {
       display: flex;
       flex-direction: column;
       gap: 8px;
       margin-top: 4px;
     }
-
     .apply-btn {
       background: linear-gradient(135deg, #6c5ce7, #8b74f0);
       border: none;
@@ -826,12 +780,10 @@ import { ToastrService } from 'ngx-toastr';
       font-size: 0.85rem;
       transition: all 0.3s ease;
     }
-
     .apply-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 20px rgba(108, 92, 231, 0.35);
     }
-
     .reset-btn {
       border-radius: 12px;
       padding: 10px;
@@ -841,19 +793,15 @@ import { ToastrService } from 'ngx-toastr';
       color: #4a5568;
       transition: all 0.3s ease;
     }
-
     .reset-btn:hover {
       background: #f8f9fa;
       border-color: #cbd5e0;
     }
-
-    /* ── Active Filters Tags ── */
     .active-filters {
       margin-top: 16px;
       padding-top: 14px;
       border-top: 1px solid #e2e8f0;
     }
-
     .active-filters-label {
       display: block;
       font-size: 0.7rem;
@@ -863,13 +811,11 @@ import { ToastrService } from 'ngx-toastr';
       letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
-
     .active-filter-tags {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
     }
-
     .filter-tag {
       display: inline-flex;
       align-items: center;
@@ -882,31 +828,25 @@ import { ToastrService } from 'ngx-toastr';
       cursor: pointer;
       transition: all 0.2s ease;
     }
-
     .filter-tag:hover {
       background: #e2e8f0;
       color: #dc3545;
     }
-
     .filter-tag i {
       font-size: 0.6rem;
     }
-
     .filter-tag.expired-tag {
       background: #fed7d7;
       color: #9b2c2c;
     }
-
     .filter-tag.expired-tag:hover {
       background: #feb2b2;
     }
-
     .filter-tag.live-tag {
       background: #feb2b2;
       color: #9b2c2c;
       animation: pulse-tag 1.5s ease-in-out infinite;
     }
-
     @keyframes pulse-tag {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.7; }
@@ -923,21 +863,16 @@ import { ToastrService } from 'ngx-toastr';
       overflow: hidden;
       background: white;
     }
-
     .event-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
-    
-    /* ✅ Expired card styles */
     .event-card.expired {
       opacity: 0.7;
       filter: grayscale(0.2);
       border: 1px solid #e5e7eb;
     }
     .event-card.expired:hover { transform: translateY(-4px); }
-    
     .card-img-wrapper { position: relative; overflow: hidden; height: 200px; }
     .card-img-top { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
     .event-card:hover .card-img-top { transform: scale(1.05); }
-    
     .category-badge {
       position: absolute;
       top: 12px;
@@ -951,7 +886,6 @@ import { ToastrService } from 'ngx-toastr';
       letter-spacing: 0.5px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    
     .tickets-badge {
       position: absolute;
       bottom: 12px;
@@ -967,7 +901,6 @@ import { ToastrService } from 'ngx-toastr';
       align-items: center;
       gap: 4px;
     }
-    
     .status-overlay {
       position: absolute;
       top: 50%;
@@ -983,23 +916,19 @@ import { ToastrService } from 'ngx-toastr';
       z-index: 5;
       pointer-events: none;
     }
-    
     .status-overlay.live {
       background: rgba(220, 53, 69, 0.9);
       color: white;
       animation: pulse-live 1.5s ease-in-out infinite;
     }
-    
     @keyframes pulse-live {
       0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
       50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.05); }
     }
-    
     .status-overlay.expired {
       background: rgba(108, 117, 125, 0.9);
       color: white;
     }
-    
     .card-body { padding: 20px; }
     .price-tag { margin-bottom: 10px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px; }
     .price-from { font-size: 0.8rem; font-weight: 500; color: #a0aec0; margin-right: 2px; }
@@ -1023,7 +952,6 @@ import { ToastrService } from 'ngx-toastr';
       margin-left: 4px;
     }
     .event-description { font-size: 0.8rem; color: #a0aec0; line-height: 1.5; margin-bottom: 14px; flex-grow: 1; }
-    
     .event-footer { 
       display: flex; 
       justify-content: space-between; 
@@ -1031,7 +959,6 @@ import { ToastrService } from 'ngx-toastr';
       padding-top: 12px; 
       border-top: 1px solid #e2e8f0; 
     }
-    
     .tickets-left { 
       font-size: 0.75rem; 
       color: #48bb78; 
@@ -1040,7 +967,6 @@ import { ToastrService } from 'ngx-toastr';
       align-items: center; 
       gap: 6px; 
     }
-    
     .tickets-left .dot { 
       display: inline-block; 
       width: 8px; 
@@ -1049,22 +975,18 @@ import { ToastrService } from 'ngx-toastr';
       background: #48bb78; 
       animation: pulse-dot 2s infinite; 
     }
-    
     .tickets-left .dot.sold-out { 
       background: #e74c3c; 
       animation: none; 
     }
-    
     .tickets-left .dot.expired-dot {
       background: #adb5bd;
       animation: none;
     }
-    
     @keyframes pulse-dot { 
       0%, 100% { opacity: 1; } 
       50% { opacity: 0.4; } 
     }
-    
     .btn-book-now {
       background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
@@ -1094,9 +1016,7 @@ import { ToastrService } from 'ngx-toastr';
       transform: none; 
       box-shadow: none; 
     }
-    
     .results-count { font-size: 0.9rem; color: #2d3748; }
-    .results-count strong { color: #2d3748; }
     .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); border: none; }
     .btn-primary:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); transform: translateY(-1px); }
     .btn-outline-secondary:hover { background: #e2e8f0; transform: translateY(-1px); }
@@ -1107,7 +1027,6 @@ import { ToastrService } from 'ngx-toastr';
     .form-control:focus, .form-select:focus { border-color: #667eea; box-shadow: 0 0 0 0.2rem rgba(102,126,234,0.25); }
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    
     @media (max-width: 768px) {
       .page-hero { padding: 50px 0 80px 0; }
       .page-hero h1 { font-size: 2.2rem; }
@@ -1146,10 +1065,8 @@ export class EventListComponent implements OnInit, OnDestroy {
   filter: EventFilter = { page: 1, pageSize: 9, showLive: false };
   pendingFilter: EventFilter = { page: 1, pageSize: 9, showLive: false };
 
-  // ✅ Only keep searchSubject - removed expiry and auto-refresh subscriptions
   private searchSubject = new Subject<string>();
 
-  // Admin check
   get isAdmin(): boolean {
     return this.authService.getRole() === 'Admin';
   }
@@ -1185,12 +1102,9 @@ export class EventListComponent implements OnInit, OnDestroy {
         this.filter.page = 1;
         this.loadEvents();
       });
-
-    // ✅ NO auto-refresh - removed startExpiryWatcher() and startAutoRefresh()
   }
 
   ngOnDestroy(): void {
-    // ✅ Only cleanup search subject
     this.searchSubject.complete();
   }
 
@@ -1198,9 +1112,6 @@ export class EventListComponent implements OnInit, OnDestroy {
   // HELPERS
   // ─────────────────────────────────────────────
 
-  /**
-   * Check if event is currently live (ongoing)
-   */
   isEventLive(event: Event): boolean {
     if (!event || !event.isActive) return false;
     const now = new Date();
@@ -1209,9 +1120,6 @@ export class EventListComponent implements OnInit, OnDestroy {
     return start <= now && end >= now;
   }
 
-  /**
-   * Check if any filters are active
-   */
   hasActiveFilters(): boolean {
     return !!(this.filter.search ||
               this.filter.city || 
@@ -1222,51 +1130,33 @@ export class EventListComponent implements OnInit, OnDestroy {
               this.filter.showLive);
   }
 
-  /**
-   * Get category label by value
-   */
   getCategoryLabel(value: number): string {
     const category = this.categories.find(c => c.value === value);
     return category ? category.label : '';
   }
 
-  /**
-   * Clear search filter
-   */
   clearSearch(): void {
     this.filter.search = '';
     this.loadEvents();
     this.toastr.info('Search cleared');
   }
 
-  /**
-   * Clear category filter
-   */
   clearCategoryFilter(): void {
     this.pendingFilter.category = undefined;
     this.filter.category = undefined;
     this.applyFilters();
   }
 
-  /**
-   * Toggle expired filter
-   */
   toggleExpiredFilter(): void {
     this.pendingFilter.includeExpired = !this.pendingFilter.includeExpired;
     this.applyFilters();
   }
 
-  /**
-   * Toggle live filter
-   */
   toggleLiveFilter(): void {
     this.pendingFilter.showLive = !this.pendingFilter.showLive;
     this.applyFilters();
   }
 
-  /**
-   * Handle search submit
-   */
   onSearchSubmit(): void {
     this.filter.page = 1;
     this.loadEvents();
@@ -1290,7 +1180,8 @@ export class EventListComponent implements OnInit, OnDestroy {
       minPrice: this.filter.minPrice,
       maxPrice: this.filter.maxPrice,
       includeExpired: this.filter.includeExpired || false,
-      showLive: this.filter.showLive || false
+      showLive: this.filter.showLive || false,
+      onlyActive: !this.filter.includeExpired
     };
 
     this.eventService.getEvents(filterToUse).subscribe({
@@ -1298,18 +1189,18 @@ export class EventListComponent implements OnInit, OnDestroy {
         const now = new Date();
         let allEvents = res.items || [];
         
-        if (!this.filter.includeExpired) {
-          allEvents = allEvents.filter(e => {
-            const endDate = new Date(e.endDateTime);
-            return endDate > now && e.isActive !== false;
-          });
-        }
-        
         if (this.filter.showLive) {
           allEvents = allEvents.filter(e => {
             const start = new Date(e.startDateTime);
             const end = new Date(e.endDateTime);
             return start <= now && end >= now;
+          });
+        }
+        
+        if (!this.filter.includeExpired) {
+          allEvents = allEvents.filter(e => {
+            const endDate = new Date(e.endDateTime);
+            return endDate > now && e.isActive !== false;
           });
         }
         
@@ -1323,6 +1214,14 @@ export class EventListComponent implements OnInit, OnDestroy {
         this.result = res;
         this.lastUpdated = new Date();
         this.loading = false;
+        
+        if (this.events.length === 0) {
+          if (this.filter.showLive) {
+            this.toastr.info('No live events happening right now', 'Live Events');
+          } else if (this.filter.includeExpired) {
+            this.toastr.info('No expired events found', 'Expired Events');
+          }
+        }
       },
       error: (error) => {
         this.loading = false;
@@ -1342,14 +1241,6 @@ export class EventListComponent implements OnInit, OnDestroy {
     this.filter.page = 1;
     this.loadEvents();
     this.toastr.info(`🎯 Showing events in ${city}`);
-  }
-
-  getGoogleMapsUrl(event: any): string {
-    if (event.googleMapsUrl) {
-      return event.googleMapsUrl;
-    }
-    const query = encodeURIComponent(`${event.venue}, ${event.city}`);
-    return `https://www.google.com/maps/search/?api=1&query=${query}`;
   }
 
   applyFilters(): void {
@@ -1373,14 +1264,24 @@ export class EventListComponent implements OnInit, OnDestroy {
 
     this.loadEvents();
     
-    if (this.filter.city) {
+    if (this.filter.showLive) {
+      this.toastr.info('Showing live events happening right now', 'Live Events');
+    } else if (this.filter.city) {
       this.toastr.info(`Showing events in ${this.filter.city}`);
     }
   }
 
   resetFilters(): void {
-    this.filter = { page: 1, pageSize: 9, showLive: false };
-    this.pendingFilter = { page: 1, pageSize: 9, showLive: false };
+    this.filter = { 
+      page: 1, 
+      pageSize: 9, 
+      showLive: false
+    };
+    this.pendingFilter = { 
+      page: 1, 
+      pageSize: 9, 
+      showLive: false
+    };
     this.loadEvents();
     this.toastr.info('All filters cleared');
   }
@@ -1393,16 +1294,29 @@ export class EventListComponent implements OnInit, OnDestroy {
   }
 
   // ─────────────────────────────────────────────
-  // HELPERS
+  // SEARCH
   // ─────────────────────────────────────────────
 
   onSearch(): void {
     this.searchSubject.next(this.filter.search || '');
   }
 
-  onImageError(event: any): void {
-    event.target.src = 'https://placehold.co/400x200?text=No+Image';
+  // ─────────────────────────────────────────────
+  // ✅ UPDATED: Book Now click handler
+  // ─────────────────────────────────────────────
+
+  /**
+   * Handle Book Now button click with logging
+   */
+  onBookNowClick(eventId: number): void {
+    console.log(`🔄 Book Now clicked for event ${eventId}`);
+    console.log(`🔗 Navigating to: /events/${eventId}`);
+    // Navigation happens via routerLink, this is just for logging
   }
+
+  // ─────────────────────────────────────────────
+  // PAGINATION
+  // ─────────────────────────────────────────────
 
   changePage(page: number): void {
     if (!this.result || page < 1 || page > this.result.totalPages) return;
@@ -1415,6 +1329,18 @@ export class EventListComponent implements OnInit, OnDestroy {
     if (!this.result) return [];
     return Array.from({ length: this.result.totalPages }, (_, i) => i + 1);
   }
+
+  // ─────────────────────────────────────────────
+  // IMAGE ERROR HANDLING
+  // ─────────────────────────────────────────────
+
+  onImageError(event: any): void {
+    event.target.src = 'https://placehold.co/400x200?text=No+Image';
+  }
+
+  // ─────────────────────────────────────────────
+  // EVENT UTILITY METHODS
+  // ─────────────────────────────────────────────
 
   getTimeRemaining(event: Event): string {
     if (!event) return 'N/A';
@@ -1446,28 +1372,26 @@ export class EventListComponent implements OnInit, OnDestroy {
     return diffMinutes > 0 && diffMinutes <= 15;
   }
 
-  /**
-   * ✅ Check if event can be edited
-   */
+  getGoogleMapsUrl(event: any): string {
+    if (event.googleMapsUrl) {
+      return event.googleMapsUrl;
+    }
+    const query = encodeURIComponent(`${event.venue}, ${event.city}`);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+  }
+
   canEditEvent(event: Event): boolean {
-    // Can't edit if status is Completed or Cancelled
     if (event.status === 'Completed' || event.status === 'Cancelled') {
       return false;
     }
-    
-    // Can't edit if event has already started
     const startDate = new Date(event.startDateTime);
     const now = new Date();
     if (startDate <= now) {
       return false;
     }
-    
     return true;
   }
 
-  /**
-   * ✅ Get tooltip message for disabled edit button
-   */
   getEditDisabledReason(event: Event): string {
     if (event.status === 'Completed') {
       return 'This event is completed and cannot be edited.';
@@ -1483,9 +1407,6 @@ export class EventListComponent implements OnInit, OnDestroy {
     return '';
   }
 
-  /**
-   * ✅ Get status badge class
-   */
   getStatusBadgeClass(status: string): string {
     switch (status) {
       case 'Published':
@@ -1500,6 +1421,10 @@ export class EventListComponent implements OnInit, OnDestroy {
         return 'bg-info';
     }
   }
+
+  // ─────────────────────────────────────────────
+  // ADMIN FUNCTIONS
+  // ─────────────────────────────────────────────
 
   cleanupExpiredEvents(): void {
     if (!this.isAdmin) {

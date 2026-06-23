@@ -1,4 +1,3 @@
-// Services/SeatService.cs  — NEW FILE, add to your Services folder
 using EventBooking.API.Data;
 using EventBooking.API.DTOs;
 using Microsoft.Data.SqlClient;
@@ -26,8 +25,9 @@ namespace EventBooking.API.Services
         private static string TierPrefix(string tier) => tier switch
         {
             "Premium"  => "P",
-            "Ordinary" => "O",
+            "Standard" => "S",
             "Economy"  => "E",
+            "Ordinary" => "O",
             _          => tier[..1].ToUpper()
         };
 
@@ -50,9 +50,10 @@ namespace EventBooking.API.Services
                 ORDER  BY
                     CASE Tier
                         WHEN 'Premium'  THEN 1
-                        WHEN 'Ordinary' THEN 2
-                        WHEN 'Economy'  THEN 3
-                        ELSE 4
+                        WHEN 'Standard' THEN 2
+                        WHEN 'Ordinary' THEN 3
+                        WHEN 'Economy'  THEN 4
+                        ELSE 5
                     END,
                     SeatNumber";
 
@@ -75,7 +76,7 @@ namespace EventBooking.API.Services
         }
 
         // ─────────────────────────────────────────────
-        // GENERATE SEATS  (called inside CreateEvent transaction)
+        // ✅ GENERATE SEATS (called inside CreateEvent transaction)
         // ─────────────────────────────────────────────
         public async Task GenerateSeatsAsync(
             int eventId,
@@ -83,9 +84,16 @@ namespace EventBooking.API.Services
             SqlConnection conn,
             SqlTransaction tx)
         {
+            if (tiers == null || !tiers.Any())
+            {
+                throw new ArgumentException("At least one seat tier is required.");
+            }
+
             const string insertSql = @"
                 INSERT INTO EventSeats (EventId, SeatNumber, Tier, Price, IsBooked)
                 VALUES (@EventId, @SeatNumber, @Tier, @Price, 0)";
+
+            int totalSeats = 0;
 
             foreach (var tier in tiers)
             {
@@ -105,17 +113,26 @@ namespace EventBooking.API.Services
                         cmd.Parameters.AddWithValue("@Tier",       tier.Tier);
                         cmd.Parameters.AddWithValue("@Price",      tier.Price);
                         await cmd.ExecuteNonQueryAsync();
+                        totalSeats++;
                     }
                 }
             }
+
+            // Log the result
+            Console.WriteLine($"✅ Generated {totalSeats} seats for event {eventId}");
         }
 
         // ─────────────────────────────────────────────
-        // REGENERATE SEATS  (called inside UpdateEvent)
+        // ✅ REGENERATE SEATS (called inside UpdateEvent)
         // Blocked if any seat is already booked
         // ─────────────────────────────────────────────
         public async Task RegenerateSeatsAsync(int eventId, List<SeatTierConfigDto> tiers)
         {
+            if (tiers == null || !tiers.Any())
+            {
+                throw new ArgumentException("At least one seat tier is required.");
+            }
+
             using var conn = _db.CreateConnection();
             await conn.OpenAsync();
             using var tx = conn.BeginTransaction();
@@ -168,12 +185,46 @@ namespace EventBooking.API.Services
                 }
 
                 await tx.CommitAsync();
+                Console.WriteLine($"✅ Regenerated {totalSeats} seats for event {eventId}");
             }
             catch
             {
                 await tx.RollbackAsync();
                 throw;
             }
+        }
+
+        // ─────────────────────────────────────────────
+        // ✅ NEW: Check if seats exist for an event
+        // ─────────────────────────────────────────────
+        public async Task<bool> HasSeatsAsync(int eventId)
+        {
+            using var conn = _db.CreateConnection();
+            await conn.OpenAsync();
+
+            const string sql = "SELECT COUNT(1) FROM EventSeats WHERE EventId = @EventId";
+
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@EventId", eventId);
+
+            int count = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+            return count > 0;
+        }
+
+        // ─────────────────────────────────────────────
+        // ✅ NEW: Get seat count for an event
+        // ─────────────────────────────────────────────
+        public async Task<int> GetSeatCountAsync(int eventId)
+        {
+            using var conn = _db.CreateConnection();
+            await conn.OpenAsync();
+
+            const string sql = "SELECT COUNT(1) FROM EventSeats WHERE EventId = @EventId";
+
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@EventId", eventId);
+
+            return Convert.ToInt32(await cmd.ExecuteScalarAsync());
         }
     }
 }

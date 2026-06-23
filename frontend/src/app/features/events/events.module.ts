@@ -4,20 +4,27 @@ import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 import { EventListComponent } from './event-list/event-list.component';
 import { EventDetailComponent } from './event-detail/event-detail.component';
-import { SeatMapComponent } from './seat-map/seat-map.component';  // Import SeatMapComponent
+import { SeatMapComponent } from './seat-map/seat-map.component';
 
 const routes: Routes = [
   { path: '', component: EventListComponent },
-  { path: ':id', component: EventDetailComponent }
+  { path: ':id', component: EventDetailComponent }  // ✅ Correct - handles /events/1, /events/2, etc.
 ];
 
 @NgModule({
   declarations: [
-    EventListComponent, 
+    EventListComponent,
     EventDetailComponent,
-    SeatMapComponent  // Add SeatMapComponent here
+    SeatMapComponent
   ],
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule.forChild(routes)],
-  exports: [SeatMapComponent]  // Export if needed in other modules
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    FormsModule,
+    RouterModule.forChild(routes)
+  ],
+  exports: [
+    SeatMapComponent
+  ]
 })
-export class EventsModule {}
+export class EventsModule { }

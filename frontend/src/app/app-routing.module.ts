@@ -7,6 +7,7 @@ const routes: Routes = [
   {
     path: 'events',
     loadChildren: () => import('./features/events/events.module').then(m => m.EventsModule)
+    // ✅ NO AuthGuard on events route - it should be public
   },
   {
     path: 'auth',
@@ -23,11 +24,12 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     data: { roles: ['Organizer', 'Admin'] }
   },
-  // ✅ ADD SEAT-SELECTION ROUTE
+  // ✅ Seat Selection Route
   {
     path: 'seat-selection',
     loadChildren: () => import('./features/seat-selection/seat-selection.module').then(m => m.SeatSelectionModule)
   },
+  // ✅ Wildcard route - redirect to home
   { path: '**', redirectTo: '' }
 ];
 
@@ -35,4 +37,4 @@ const routes: Routes = [
   imports: [RouterModule.forRoot(routes, { scrollPositionRestoration: 'top' })],
   exports: [RouterModule]
 })
-export class AppRoutingModule {}
+export class AppRoutingModule { }

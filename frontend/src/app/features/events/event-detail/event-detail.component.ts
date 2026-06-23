@@ -8,7 +8,6 @@ import { Event, EventSeat } from '../../../core/models/models';
 import { ToastrService } from 'ngx-toastr';
 import { SeatMapComponent } from '../seat-map/seat-map.component';
 
-// ✅ IMPORT RXJS OPERATORS
 import { 
   finalize, 
   switchMap, 
@@ -17,10 +16,9 @@ import {
   catchError, 
   tap, 
   takeUntil,
-  debounceTime,
   distinctUntilChanged
 } from 'rxjs/operators';
-import { Subject, forkJoin, combineLatest } from 'rxjs';
+import { Subject } from 'rxjs';
 
 @Component({
   selector: 'app-event-detail',
@@ -192,7 +190,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
             <!-- For Regular Users - Show Booking Options -->
             <ng-container *ngIf="!isOrganizer">
               
-              <!-- Seat Map Toggle Card -->
+              <!-- Seat Map Toggle Card - Only show if event has seat map -->
               <div class="booking-card" *ngIf="hasSeatMap && !isExpired">
                 <div class="booking-card-body">
                   <div class="d-flex justify-content-between align-items-center">
@@ -248,7 +246,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                 </div>
               </div>
 
-              <!-- Traditional Booking Card -->
+              <!-- ✅ TRADITIONAL BOOKING CARD - Shows when NO seat map OR seat selection is OFF -->
               <div class="booking-card mt-3" *ngIf="!enableSeatSelection || !hasSeatMap">
                 <div class="booking-card-header">
                   <i class="fas fa-ticket-alt me-2"></i>
@@ -336,7 +334,6 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                                  formControlName="name" 
                                  placeholder="Full Name *">
                           
-                          <!-- Show contact fields for EACH attendee OR only first when SINGLE -->
                           <ng-container *ngIf="ticketDeliveryOption === 'each' || i === 0">
                             <!-- Contact Method Selection -->
                             <div class="contact-method-selector mb-2">
@@ -372,7 +369,6 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                             </div>
                           </ng-container>
                           
-                          <!-- Show "Same as primary" message for other attendees when SINGLE mode -->
                           <div *ngIf="ticketDeliveryOption === 'single' && i > 0" class="text-muted small mt-1">
                             <i class="fas fa-share me-1"></i>
                             Tickets will be sent to {{ getPrimaryContact() }}
@@ -407,7 +403,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                 </div>
               </div>
 
-              <!-- ✅ IMPROVED UI: Seat-based booking summary with Delivery Option -->
+              <!-- ✅ SEAT-BASED BOOKING SUMMARY - Only shows when seat selection is ON -->
               <div *ngIf="enableSeatSelection && hasSeatMap && selectedSeats.length > 0 && !isExpired" 
                    class="booking-card mt-3">
                 
@@ -425,7 +421,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                 
                 <div class="booking-card-body">
                   
-                  <!-- Delivery Option - Improved UI -->
+                  <!-- Delivery Option -->
                   <div class="delivery-option mb-4">
                     <div class="d-flex align-items-center gap-2 mb-2">
                       <i class="fas fa-envelope text-primary"></i>
@@ -456,7 +452,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                     </div>
                   </div>
 
-                  <!-- Selected Seats Grid - Improved -->
+                  <!-- Selected Seats Grid -->
                   <div class="selected-seats-grid">
                     <div *ngFor="let seat of selectedSeats; let i = index" class="selected-seat-item">
                       
@@ -488,9 +484,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                                  [disabled]="bookingLoading || selectionDisabled || isExpired">
                         </div>
                         
-                        <!-- Show contact fields for EACH attendee OR only first when SINGLE -->
                         <ng-container *ngIf="ticketDeliveryOption === 'each' || i === 0">
-                          
                           <!-- Contact Method Selection -->
                           <div class="contact-method-selector mb-2">
                             <div class="btn-group btn-group-sm w-100" role="group">
@@ -532,7 +526,6 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                           </div>
                         </ng-container>
                         
-                        <!-- "Same as primary" message for other attendees when SINGLE mode -->
                         <div *ngIf="ticketDeliveryOption === 'single' && i > 0" class="text-muted small d-flex align-items-center gap-1 mt-1">
                           <i class="fas fa-share-alt"></i>
                           <span>Tickets will be sent to 
@@ -545,13 +538,13 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                     </div>
                   </div>
 
-                  <!-- Total Amount - Improved -->
+                  <!-- Total Amount -->
                   <div class="total-amount d-flex justify-content-between align-items-center mt-3 pt-3">
                     <span class="fw-semibold">Total Amount</span>
                     <span class="amount fw-bold text-primary">₹{{ seatTotalAmount | number:'1.2-2' }}</span>
                   </div>
 
-                  <!-- Confirm Button - Improved -->
+                  <!-- Confirm Button -->
                   <button class="btn-book w-100 mt-3" (click)="bookWithSeats()" 
                           [disabled]="bookingLoading || !isSeatAttendeesValid() || selectionDisabled || isExpired">
                     <span *ngIf="bookingLoading" class="spinner-border spinner-border-sm me-2"></span>
@@ -559,7 +552,7 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
                     {{ bookingLoading ? 'Processing...' : 'Confirm & Book' }}
                   </button>
                   
-                  <!-- Validation Message - Improved -->
+                  <!-- Validation Message -->
                   <div *ngIf="!isSeatAttendeesValid() && selectedSeats.length > 0" class="validation-message mt-2">
                     <i class="fas fa-exclamation-circle me-1"></i>
                     Please enter name and contact details for all attendees.
@@ -730,8 +723,6 @@ import { Subject, forkJoin, combineLatest } from 'rxjs';
       background-color: #28a745;
       border-color: #28a745;
     }
-    
-    /* ✅ IMPROVED UI STYLES */
     
     /* Delivery Option */
     .delivery-option {
@@ -1006,7 +997,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   seats: EventSeat[] = [];
   selectedSeats: EventSeat[] = [];
   
-  // ✅ Support both email and phone
   seatAttendees: { 
     name: string; 
     email: string; 
@@ -1014,7 +1004,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     contactMethod: 'email' | 'phone';
   }[] = [];
   
-  // ✅ Ticket delivery option
   ticketDeliveryOption: 'each' | 'single' = 'each';
   
   loading = true;
@@ -1029,7 +1018,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   ticketOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   isExpired = false;
 
-  // ✅ For unsubscribing
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -1043,71 +1031,114 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // ✅ Use combineLatest to combine multiple observables
-    combineLatest([
-      this.authService.currentUser$,
-      this.route.paramMap
-    ]).pipe(
+    console.log('🔍 EventDetailComponent initialized');
+    
+    this.route.paramMap.pipe(
       takeUntil(this.destroy$),
-      tap(([user, params]) => {
-        this.isLoggedIn = !!user;
-        this.isOrganizer = user?.role === 'Organizer' || user?.role === 'Admin';
-        console.log('🔐 User role:', user?.role, 'IsOrganizer:', this.isOrganizer);
+      map(params => {
+        const id = params.get('id');
+        console.log('📋 Event ID from route:', id);
+        return id;
       }),
-      map(([_, params]) => params.get('id')),
       distinctUntilChanged(),
       switchMap(id => {
-        if (id) {
-          return this.eventService.getEventById(+id).pipe(
-            tap(event => {
-              this.event = event;
-              this.hasSeatMap = event.seatConfig ? true : false;
-              this.checkExpiredStatus(event);
-            }),
-            switchMap(event => {
-              if (this.hasSeatMap && !this.isExpired) {
-                return this.bookingService.getEventSeats(event.id).pipe(
-                  tap(seats => {
-                    this.seats = seats;
-                    console.log(`🪑 Loaded ${seats.length} seats for event ${event.id}`);
-                  })
-                );
-              }
-              return [];
-            })
-          );
+        if (!id) {
+          console.warn('⚠️ No event ID provided in route');
+          this.toastr.error('No event ID provided');
+          this.router.navigate(['/']);
+          return [];
         }
-        return [];
+        
+        const eventId = +id;
+        console.log(`🔄 Loading event with ID: ${eventId}`);
+        
+        this.authService.currentUser$.pipe(
+          takeUntil(this.destroy$)
+        ).subscribe(user => {
+          this.isLoggedIn = !!user;
+          this.isOrganizer = user?.role === 'Organizer' || user?.role === 'Admin';
+          console.log('🔐 User role:', user?.role, 'IsOrganizer:', this.isOrganizer);
+        });
+        
+        return this.eventService.getEventById(eventId).pipe(
+          tap(event => {
+            console.log('✅ Event loaded successfully:', event);
+            this.event = event;
+            
+            // 🔥 CRITICAL FIX: Use seatConfig to determine if event has seat map
+            this.hasSeatMap = event.seatConfig ? true : false;
+            console.log('🪑 hasSeatMap:', this.hasSeatMap);
+            console.log('🪑 seatConfig:', event.seatConfig);
+            
+            // ✅ IMPORTANT: Initialize seatAttendees and selectedSeats
+            this.seatAttendees = [];
+            this.selectedSeats = [];
+            
+            this.checkExpiredStatus(event);
+          }),
+          switchMap(event => {
+            // ✅ Only load seats if event has seat map and is not expired
+            if (this.hasSeatMap && !this.isExpired) {
+              console.log(`🪑 Loading seats for event ID: ${event.id}`);
+              return this.bookingService.getEventSeats(event.id).pipe(
+                tap(seats => {
+                  this.seats = seats || [];
+                  console.log(`✅ Loaded ${seats?.length || 0} seats for event ${event.id}`);
+                }),
+                catchError((err) => {
+                  console.warn('⚠️ No seats found for this event:', err);
+                  this.seats = [];
+                  return [];
+                })
+              );
+            }
+            // ✅ If no seat map, ensure seats is empty
+            console.log('ℹ️ No seat map found, skipping seat loading');
+            this.seats = [];
+            return [];
+          }),
+          catchError((err) => {
+            console.error('❌ Error in event loading pipeline:', err);
+            this.toastr.error('Failed to load event details');
+            this.loading = false;
+            
+            if (err?.status === 404) {
+              this.router.navigate(['/']);
+            }
+            return [];
+          })
+        );
       })
     ).subscribe({
       next: () => {
         this.loading = false;
         this.initializeBookingForm();
         console.log('✅ Event detail loaded successfully');
+        console.log('📊 Final state - hasSeatMap:', this.hasSeatMap);
+        console.log('📊 Final state - seats count:', this.seats?.length);
       },
       error: (err) => {
         this.loading = false;
-        console.error('❌ Error loading event:', err);
+        console.error('❌ Final error loading event:', err);
         this.toastr.error('Event not found', 'Error');
         this.router.navigate(['/']);
       }
     });
   }
 
-  /**
-   * ✅ Initialize booking form with reactive form
-   */
   initializeBookingForm(): void {
+    console.log('📋 Initializing booking form...');
+    console.log('📋 hasSeatMap:', this.hasSeatMap);
+    console.log('📋 isExpired:', this.isExpired);
+    
     this.bookingForm = this.fb.group({
       ticketCount: [1],
       attendees: this.fb.array([this.createAttendee()])
     });
-    console.log('📋 Booking form initialized');
+    
+    console.log('✅ Booking form initialized');
   }
 
-  /**
-   * ✅ Create attendee form with contact method
-   */
   createAttendee(): FormGroup {
     return this.fb.group({
       name: ['', Validators.required],
@@ -1117,9 +1148,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Check expired status of event
-   */
   checkExpiredStatus(event: Event): void {
     const now = new Date();
     const endDate = new Date(event.endDateTime);
@@ -1136,9 +1164,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     console.log(`📅 Event expired: ${this.isExpired}`);
   }
 
-  /**
-   * Get time remaining for display
-   */
   getTimeRemaining(): string {
     if (!this.event || this.isExpired) return 'Ended';
     
@@ -1158,9 +1183,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     return `${Math.floor(diff / 1000)}s remaining`;
   }
 
-  /**
-   * Helper method to generate Google Maps URL with proper error handling
-   */
   getGoogleMapsUrl(): string {
     if (!this.event) return '#';
     
@@ -1179,9 +1201,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     return `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
   }
 
-  /**
-   * Method to handle seat toggle change
-   */
   onSeatToggleChange(enabled: boolean): void {
     if (this.isExpired) {
       this.toastr.warning('This event has ended. Seat selection is disabled.');
@@ -1195,20 +1214,16 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     console.log(`🪑 Seat selection toggled: ${enabled}`);
   }
 
-  /**
-   * ✅ Load seats with mergeMap for parallel loading
-   */
   loadSeats(): void {
     if (!this.event || this.isExpired) return;
     
     this.loadingSeats = true;
     console.log('🔄 Loading seats for event:', this.event.id);
     
-    // ✅ Use mergeMap to handle parallel requests
     this.bookingService.getEventSeats(this.event.id).pipe(
       mergeMap(seats => {
-        this.seats = seats;
-        console.log(`✅ Loaded ${seats.length} seats`);
+        this.seats = seats || [];
+        console.log(`✅ Loaded ${seats?.length || 0} seats`);
         return this.eventService.getEventById(this.event!.id);
       }),
       tap(event => {
@@ -1221,14 +1236,12 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       catchError((err) => {
         console.error('Failed to load seats:', err);
         this.toastr.error('Failed to load seat map');
+        this.seats = [];
         return [];
       })
     ).subscribe();
   }
 
-  /**
-   * ✅ UPDATED: When seats are selected
-   */
   onSeatSelectionChange(seats: EventSeat[]): void {
     this.selectedSeats = seats;
     this.seatAttendees = seats.map(() => ({ 
@@ -1268,11 +1281,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     event.target.src = 'https://placehold.co/1600x450?text=Event+Image';
   }
 
-  /**
-   * ✅ UPDATED: Validation - requires name and either email or phone
-   */
   isSeatAttendeesValid(): boolean {
-    // When "each" mode: validate all attendees
     if (this.ticketDeliveryOption === 'each') {
       return this.seatAttendees.every(attendee => {
         const hasName = attendee.name.trim() !== '';
@@ -1282,7 +1291,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       });
     }
     
-    // When "single" mode: only validate the first attendee's contact
     const primary = this.seatAttendees[0];
     if (!primary) return false;
     
@@ -1293,9 +1301,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     return hasName && (hasEmail || hasPhone);
   }
 
-  /**
-   * ✅ Validate attendee form in traditional booking
-   */
   validateAttendeeForm(attendee: any): boolean {
     const name = attendee.name?.trim();
     const contactMethod = attendee.contactMethod;
@@ -1312,9 +1317,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  /**
-   * ✅ NEW: Get primary contact for display in "single" mode
-   */
   getPrimaryContact(): string {
     const primary = this.bookingForm.get('attendees')?.value?.[0];
     if (!primary) return 'No contact set';
@@ -1326,19 +1328,14 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * ✅ NEW: Validate traditional booking form
-   */
   isTraditionalBookingValid(): boolean {
     const attendees = this.bookingForm.get('attendees')?.value;
     if (!attendees || attendees.length === 0) return false;
     
-    // Check all attendees have names
     for (const attendee of attendees) {
       if (!attendee.name || attendee.name.trim() === '') return false;
     }
     
-    // When "each" mode: validate all attendees
     if (this.ticketDeliveryOption === 'each') {
       for (const attendee of attendees) {
         if (attendee.contactMethod === 'email') {
@@ -1349,7 +1346,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       }
     }
     
-    // When "single" mode: only validate first attendee's contact
     if (this.ticketDeliveryOption === 'single') {
       const primary = attendees[0];
       if (primary.contactMethod === 'email') {
@@ -1362,9 +1358,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  /**
-   * ✅ UPDATED: Book with switchMap for cancellation
-   */
   book(): void {
     if (this.isExpired) {
       this.toastr.error('This event has ended and cannot be booked.');
@@ -1376,7 +1369,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       return; 
     }
     
-    // ✅ Validate each attendee has contact info
     const attendees = this.bookingForm.get('attendees')?.value;
     for (const attendee of attendees) {
       if (!this.validateAttendeeForm(attendee)) {
@@ -1398,7 +1390,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         contactMethod: a.contactMethod
       }))
     }).pipe(
-      // ✅ Use switchMap to cancel previous requests
       switchMap(booking => {
         this.toastr.success('Booking confirmed! Check your email or SMS.');
         console.log('✅ Booking created:', booking.bookingReference);
@@ -1415,9 +1406,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     ).subscribe();
   }
 
-  /**
-   * ✅ UPDATED: Book with seats using switchMap
-   */
   bookWithSeats(): void {
     if (this.isExpired) {
       this.toastr.error('This event has ended and cannot be booked.');
@@ -1438,7 +1426,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     this.selectionDisabled = true;
     console.log(`📋 Booking ${this.selectedSeats.length} seats for event:`, this.event?.id);
 
-    // ✅ Prepare attendees data based on delivery option
     let attendeesData: { 
       name: string; 
       email: string | null; 
@@ -1448,7 +1435,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     }[];
 
     if (this.ticketDeliveryOption === 'single') {
-      // All tickets go to the first attendee's contact
       const primary = this.seatAttendees[0];
       attendeesData = this.seatAttendees.map((a) => ({
         name: a.name,
@@ -1458,7 +1444,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         seatId: this.selectedSeats[this.seatAttendees.indexOf(a)].id
       }));
     } else {
-      // Each attendee gets their own contact
       attendeesData = this.seatAttendees.map((a, index) => ({
         name: a.name,
         email: a.contactMethod === 'email' ? a.email : null,
@@ -1493,7 +1478,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         
         if (isConcurrencyError) {
           this.toastr.error('Some seats were just booked by another user. Please refresh and try again.');
-          // ✅ Refresh seats
           this.bookingService.getEventSeats(this.event!.id).pipe(
             tap(seats => {
               this.seats = seats;
